@@ -10,6 +10,8 @@ import DistrictDetail from './pages/DistrictDetail'
 import Alerts from './pages/Alerts'
 import SyncStatus from './pages/SyncStatus'
 import Export from './pages/Export'
+import Tenders from './pages/Tenders'
+import DBT from './pages/DBT'
 
 export default function App() {
   return (
@@ -22,6 +24,8 @@ export default function App() {
         <Route path="schemes/:id" element={<SchemeDetail />} />
         <Route path="districts"   element={<Districts />} />
         <Route path="districts/:id" element={<DistrictDetail />} />
+        <Route path="tenders"     element={<Tenders />} />
+        <Route path="dbt"         element={<DBT />} />
         <Route path="alerts"      element={<Alerts />} />
         <Route path="sync"        element={<SyncStatus />} />
         <Route path="export"      element={<Export />} />

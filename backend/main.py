@@ -9,7 +9,7 @@ from loguru import logger
 from config import get_settings
 from database.connection import init_db, seed_reference_data
 from scheduler.jobs import create_scheduler
-from api.routes import budget, schemes, districts, alerts, export
+from api.routes import budget, schemes, districts, alerts, export, tenders, dbt
 
 settings = get_settings()
 scheduler = None
@@ -49,6 +49,8 @@ app.include_router(schemes.router, prefix="/api/v1")
 app.include_router(districts.router, prefix="/api/v1")
 app.include_router(alerts.router, prefix="/api/v1")
 app.include_router(export.router, prefix="/api/v1")
+app.include_router(tenders.router, prefix="/api/v1")
+app.include_router(dbt.router, prefix="/api/v1")
 
 
 @app.get("/api/v1/health")

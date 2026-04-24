@@ -2,7 +2,8 @@ import { NavLink, Outlet } from 'react-router-dom'
 import { useAppStore } from '../store'
 import {
   LayoutDashboard, Building2, ListChecks,
-  MapPin, Bell, Database, ChevronLeft, ChevronRight, Download
+  MapPin, Bell, Database, ChevronLeft, ChevronRight, Download,
+  FileText, Wallet
 } from 'lucide-react'
 import clsx from 'clsx'
 import DataFreshness from './DataFreshness'
@@ -12,6 +13,8 @@ const NAV = [
   { to: '/departments', icon: Building2,       label: 'Departments' },
   { to: '/schemes',     icon: ListChecks,      label: 'Schemes'     },
   { to: '/districts',   icon: MapPin,          label: 'Districts'   },
+  { to: '/tenders',     icon: FileText,        label: 'Tenders'     },
+  { to: '/dbt',         icon: Wallet,          label: 'DBT Flow'    },
   { to: '/alerts',      icon: Bell,            label: 'Alerts'      },
   { to: '/export',      icon: Download,        label: 'Export'      },
   { to: '/sync',        icon: Database,        label: 'Sync Status' },

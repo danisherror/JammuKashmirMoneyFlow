@@ -208,3 +208,53 @@ class LowUtilizationAlert(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+# ── Tenders ───────────────────────────────────────────────────────────────────
+
+class TenderSummary(BaseModel):
+    id: int
+    tender_ref: str
+    title: str
+    department_name: str
+    estimated_cost_lakhs: Optional[int]
+    awarded_cost_lakhs: Optional[int]
+    contractor_name: Optional[str]
+    status: Optional[str]
+    published_date: Optional[date]
+    award_date: Optional[date]
+
+    class Config:
+        from_attributes = True
+
+
+class ContractorLeaderboardItem(BaseModel):
+    contractor_name: str
+    total_tenders_won: int
+    total_awarded_lakhs: int
+
+
+# ── DBT ───────────────────────────────────────────────────────────────────────
+
+class DBTSchemeSummary(BaseModel):
+    scheme_id: int
+    scheme_name: str
+    scheme_code: str
+    financial_year: str
+    total_beneficiaries_enrolled: int
+    total_beneficiaries_paid: int
+    total_amount_transferred_lakhs: int
+    overall_gap_pct: float
+
+
+class DBTDistrictGap(BaseModel):
+    district_id: int
+    district_name: str
+    district_code: str
+    beneficiaries_enrolled: int
+    beneficiaries_paid: int
+    amount_transferred_lakhs: int
+    last_mile_gap_pct: float
+
+    class Config:
+        from_attributes = True
