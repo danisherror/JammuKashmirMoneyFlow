@@ -658,14 +658,24 @@ docker-compose.yml:
 
 ---
 
-## 📋 Build Order (Phase-wise)
+## 📋 Current Project Status & Build Phases
 
-| Phase | What | Time Estimate |
-|---|---|---|
-| **1** | DB schema + FastAPI skeleton + MGNREGA + JJM collectors (easiest APIs) | Week 1 |
-| **2** | Budget/CGA collector + PDF parser + department endpoints | Week 2 |
-| **3** | React frontend — Overview + Departments pages | Week 3 |
-| **4** | Tender collector + Schemes + Districts pages | Week 4 |
-| **5** | DBT collector + CAG PDF → Claude summarizer | Week 5 |
-| **6** | District heatmap + Sankey diagram + polish | Week 6 |
+### ✅ COMPLETED
+- **Core Architecture:** FastAPI Backend, PostgreSQL Database, React Frontend (Zustand + React Query).
+- **Dashboard Pages:** Overview, Departments, Schemes, Districts, Alerts, Sync Status, Export.
+- **Phase 1 & 2 Data Collectors:** MGNREGA, Jal Jeevan Mission, PMAY (Housing), DBT Bharat, Tenders (jktenders.gov.in).
+- **Interactive Map:** District-wise bubble map integrated into the Scheme Details page (using Google Maps tiles).
+- **Historical Velocity & Projections:** Time-series charts calculating daily run-rates and predicting March 31st fund surrender risks.
+- **Data Export Engine:** CSV and ZIP download functionality for researchers/journalists (Schemes, Tenders, DBT).
+- **Smart Simulation Fallback:** Resilient mock data generation if government portals are geo-blocked or unreachable.
+
+### 🚧 IN PROGRESS / NEXT UP
+- **Automated "Red Flag" Alerting:** (Implementation Plan approved) A background engine to send Telegram/Email alerts when a scheme's utilization drops below critical thresholds.
+
+### ⏳ PENDING (Future Work)
+- **Tender & DBT Dedicated UI:** Frontend pages (`/tenders` and `/dbt`) to visualize the data we are already collecting.
+- **Budget / CGA Collector:** Automated downloading and parsing of monthly expenditure PDFs from cga.nic.in.
+- **CAG Audit Alert Feed:** Downloading CAG PDFs and using Claude AI to summarize audit irregularities.
+- **Overview Sankey Diagram:** Visualizing the macro money flow from Central Govt → J&K → Departments.
+- **PFMS Collector:** Tracking central funds released to J&K implementing agencies.
 
