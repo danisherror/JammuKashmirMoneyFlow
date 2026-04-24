@@ -16,31 +16,32 @@ export default function UtilBar({ allocated, released, utilized, showLabels = tr
   return (
     <div className="w-full">
       {showLabels && (
-        <div className="flex justify-between mb-1 items-end">
-          <span className="mono text-[8px] text-dim">ALLOCATED</span>
+        <div className="flex justify-between mb-1.5 items-end">
+          <span className="text-[9px] font-semibold text-slate-500 tracking-widest uppercase">Allocated</span>
           {released != null && (
-            <span className="mono text-[8px] text-purple">RELEASED</span>
+            <span className="text-[9px] font-semibold text-blue-400 tracking-widest uppercase">Released</span>
           )}
-          <span className="mono text-[8px]" style={{ color: utilPct >= 75 ? '#00ff88' : utilPct >= 40 ? '#ffd700' : '#ff3366' }}>
-            {fmtPct(utilPct)} UTILIZED
+          <span className="text-[9px] font-bold tracking-widest uppercase" style={{ color: utilPct >= 75 ? 'var(--accent-green)' : utilPct >= 40 ? 'var(--accent-gold)' : 'var(--accent-red)' }}>
+            {fmtPct(utilPct)} Utilized
           </span>
         </div>
       )}
-      <div className="h-3 w-full relative" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid #1a2a3a' }}>
+      <div className="h-2.5 w-full relative rounded-full overflow-hidden bg-slate-800/50 shadow-inner">
         {/* Released layer */}
         {released != null && (
           <div
-            className="absolute top-0 left-0 h-full"
-            style={{ width: `${relPct}%`, background: 'rgba(0,170,255,0.25)' }}
+            className="absolute top-0 left-0 h-full rounded-full transition-all duration-700"
+            style={{ width: `${relPct}%`, background: 'rgba(56, 189, 248, 0.3)' }}
           />
         )}
         {/* Utilized layer */}
         <div
-          className="absolute top-0 left-0 h-full transition-all duration-700"
+          className="absolute top-0 left-0 h-full rounded-full transition-all duration-700 shadow-[0_0_10px_rgba(255,255,255,0.1)]"
           style={{
             width: `${utilPct}%`,
-            background: utilPct >= 75 ? 'rgba(0,255,136,0.5)' : utilPct >= 40 ? 'rgba(255,215,0,0.5)' : 'rgba(255,51,102,0.4)',
-            borderRight: utilPct > 0 ? `2px solid ${utilPct >= 75 ? '#00ff88' : utilPct >= 40 ? '#ffd700' : '#ff3366'}` : 'none',
+            background: utilPct >= 75 ? 'linear-gradient(90deg, rgba(52,211,153,0.6), rgba(52,211,153,1))' : 
+                        utilPct >= 40 ? 'linear-gradient(90deg, rgba(251,191,36,0.6), rgba(251,191,36,1))' : 
+                        'linear-gradient(90deg, rgba(251,113,133,0.6), rgba(251,113,133,1))',
           }}
         />
       </div>

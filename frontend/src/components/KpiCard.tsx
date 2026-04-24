@@ -16,21 +16,54 @@ export default function KpiCard({ label, value, sub, direction = 'neutral', form
     format === 'pct'   ? fmtPct(value as number) :
     value ?? '—'
 
-  const barColor =
-    direction === 'up'   ? '#00ff88' :
-    direction === 'down' ? '#ff3366' : '#ffd700'
+  // Map direction to the new CSS variables
+  const colorMap = {
+    up: 'var(--accent-green)',
+    down: 'var(--accent-red)',
+    neutral: 'var(--accent-blue)',
+  }
+  
+  const bgMap = {
+    up: 'rgba(52, 211, 153, 0.05)',
+    down: 'rgba(251, 113, 133, 0.05)',
+    neutral: 'rgba(56, 189, 248, 0.05)',
+  }
+
+  const barColor = colorMap[direction]
+  const bgColor = bgMap[direction]
 
   return (
-    <div className={clsx('panel flex flex-col gap-1 cursor-default', className)}>
-      <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 2, background: barColor }} />
-      <div className="mono text-[8px] text-dim tracking-widest uppercase">{label}</div>
+    <div 
+      className={clsx(
+        'panel flex flex-col gap-2 overflow-hidden transition-all duration-300 hover:-translate-y-1', 
+        className
+      )}
+      style={{ 
+        background: `linear-gradient(to bottom right, var(--panel-bg), ${bgColor})`,
+      }}
+    >
+      {/* Soft top glow line */}
+      <div 
+        className="absolute top-0 left-0 right-0 h-1" 
+        style={{ 
+          background: `linear-gradient(90deg, transparent, ${barColor}, transparent)`,
+          opacity: 0.6
+        }} 
+      />
+      
+      <div className="font-semibold text-[10px] text-slate-400 tracking-widest uppercase">{label}</div>
+      
       <div
-        className="display text-2xl tracking-wide leading-none"
-        style={{ color: barColor, textShadow: `0 0 16px ${barColor}66` }}
+        className="display text-4xl tracking-tight leading-none font-bold"
+        style={{ 
+          color: barColor, 
+          textShadow: `0 4px 20px ${barColor}40` 
+        }}
       >
         {display as string}
       </div>
-      {sub && <div className="mono text-[9px] text-dim">{sub}</div>}
+      
+      {sub && <div className="text-xs text-slate-500 font-medium mt-auto">{sub}</div>}
     </div>
   )
 }

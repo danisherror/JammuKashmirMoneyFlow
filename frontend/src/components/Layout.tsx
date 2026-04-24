@@ -29,31 +29,37 @@ export default function Layout() {
       {/* Sidebar */}
       <aside
         className={clsx(
-          'flex flex-col border-r transition-all duration-200 flex-shrink-0',
-          sidebarOpen ? 'w-52' : 'w-14'
+          'flex flex-col transition-all duration-300 flex-shrink-0 z-10',
+          sidebarOpen ? 'w-64' : 'w-20'
         )}
-        style={{ background: '#080e18', borderColor: '#1a2a3a' }}
+        style={{ 
+          background: 'rgba(15, 23, 42, 0.4)', 
+          backdropFilter: 'blur(20px)',
+          WebkitBackdropFilter: 'blur(20px)',
+          borderRight: '1px solid var(--panel-border)' 
+        }}
       >
         {/* Logo */}
-        <div className="flex items-center gap-3 px-3 py-4 border-b" style={{ borderColor: '#1a2a3a' }}>
-          <span className="display text-3xl text-gold glow-gold flex-shrink-0">₹</span>
+        <div className="flex items-center gap-4 px-5 py-6 border-b" style={{ borderColor: 'var(--panel-border)' }}>
+          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center shadow-lg shadow-blue-500/20 flex-shrink-0">
+            <span className="text-white font-bold text-xl">₹</span>
+          </div>
           {sidebarOpen && (
-            <div>
-              <div className="mono text-xs text-gold tracking-widest">J&K FLOW</div>
-              <div className="mono text-[8px] text-dim tracking-widest">PUBLIC MONEY</div>
+            <div className="overflow-hidden">
+              <div className="display text-xl text-white tracking-wide truncate">J&K FLOW</div>
+              <div className="text-[10px] text-blue-400 font-semibold tracking-widest uppercase">Public Money</div>
             </div>
           )}
         </div>
 
         {/* FY selector */}
         {sidebarOpen && (
-          <div className="px-3 py-2 border-b" style={{ borderColor: '#1a2a3a' }}>
-            <div className="mono text-[8px] text-dim mb-1 tracking-widest">FISCAL YEAR</div>
+          <div className="px-5 py-4 border-b" style={{ borderColor: 'var(--panel-border)' }}>
+            <div className="text-[10px] text-slate-400 font-semibold mb-2 tracking-widest uppercase">Fiscal Year</div>
             <select
               value={financialYear}
               onChange={e => setFinancialYear(e.target.value)}
-              className="w-full mono text-[10px] bg-transparent text-gold border px-2 py-1 outline-none"
-              style={{ borderColor: '#1a2a3a' }}
+              className="w-full bg-slate-800/50 text-white border border-slate-700/50 rounded-lg px-3 py-2 outline-none focus:border-blue-500/50 transition-colors cursor-pointer"
             >
               <option value="2024-25">2024-25</option>
               <option value="2023-24">2023-24</option>
@@ -62,7 +68,7 @@ export default function Layout() {
         )}
 
         {/* Nav */}
-        <nav className="flex-1 py-2">
+        <nav className="flex-1 py-4 overflow-y-auto px-3 space-y-1">
           {NAV.map(({ to, icon: Icon, label }) => (
             <NavLink
               key={to}
@@ -70,15 +76,15 @@ export default function Layout() {
               end={to === '/'}
               className={({ isActive }) =>
                 clsx(
-                  'flex items-center gap-3 px-3 py-2.5 mx-1 my-0.5 transition-all',
+                  'flex items-center gap-3 px-3 py-3 rounded-xl transition-all duration-200 group',
                   isActive
-                    ? 'bg-green-900/20 border-l-2 border-green-400 text-green'
-                    : 'text-dim hover:text-white border-l-2 border-transparent hover:bg-white/5'
+                    ? 'bg-blue-500/10 text-blue-400 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.1)]'
+                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/40'
                 )
               }
             >
-              <Icon size={15} className="flex-shrink-0" />
-              {sidebarOpen && <span className="mono text-[10px] tracking-widest">{label}</span>}
+              <Icon size={20} className={clsx("flex-shrink-0 transition-transform group-hover:scale-110")} />
+              {sidebarOpen && <span className="font-medium text-sm tracking-wide">{label}</span>}
             </NavLink>
           ))}
         </nav>
@@ -86,10 +92,10 @@ export default function Layout() {
         {/* Toggle */}
         <button
           onClick={toggleSidebar}
-          className="flex items-center justify-center py-3 border-t text-dim hover:text-white transition-colors"
-          style={{ borderColor: '#1a2a3a' }}
+          className="flex items-center justify-center py-4 border-t text-slate-400 hover:text-white hover:bg-slate-800/50 transition-colors"
+          style={{ borderColor: 'var(--panel-border)' }}
         >
-          {sidebarOpen ? <ChevronLeft size={14} /> : <ChevronRight size={14} />}
+          {sidebarOpen ? <ChevronLeft size={18} /> : <ChevronRight size={18} />}
         </button>
       </aside>
 
