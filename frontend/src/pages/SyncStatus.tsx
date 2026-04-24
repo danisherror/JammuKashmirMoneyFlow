@@ -22,7 +22,7 @@ const COLLECTORS: CollectorDef[] = [
     trigger_key: 'mgnrega',
     source:      'nreganarayan.nic.in',
     source_url:  'https://nreganarayan.nic.in/netnrega/home.aspx',
-    schedule:    'Daily 6:00 AM IST',
+    schedule:    'Weekly (Sunday 6:00 AM)',
     phase:       1,
   },
   {
@@ -31,35 +31,35 @@ const COLLECTORS: CollectorDef[] = [
     trigger_key: 'jjm',
     source:      'ejalshakti.gov.in',
     source_url:  'https://ejalshakti.gov.in/jjmreport/JJMIndia.aspx',
-    schedule:    'Daily 6:00 AM IST',
+    schedule:    'Weekly (Sunday 6:00 AM)',
     phase:       1,
   },
   {
     name:        'pmay_collector',
     label:       'PM AWAS YOJANA',
-    trigger_key: null,
+    trigger_key: 'pmay',
     source:      'pmayg.nic.in',
     source_url:  'https://pmayg.nic.in',
-    schedule:    'Weekly (Phase 2)',
-    phase:       2,
+    schedule:    'Weekly (Sunday 6:00 AM)',
+    phase:       1,
   },
   {
     name:        'dbt_collector',
     label:       'DBT TRANSFERS',
-    trigger_key: null,
+    trigger_key: 'dbt',
     source:      'dbtbharat.gov.in',
     source_url:  'https://dbtbharat.gov.in',
-    schedule:    'Daily (Phase 2)',
-    phase:       2,
+    schedule:    'Weekly (Sunday 6:00 AM)',
+    phase:       1,
   },
   {
     name:        'tender_collector',
     label:       'TENDERS',
-    trigger_key: null,
+    trigger_key: 'tenders',
     source:      'jktenders.gov.in',
     source_url:  'https://jktenders.gov.in',
-    schedule:    'Daily (Phase 2)',
-    phase:       2,
+    schedule:    'Weekly (Sunday 6:00 AM)',
+    phase:       1,
   },
   {
     name:        'cag_collector',
@@ -253,8 +253,8 @@ export default function SyncStatus() {
         <div className="panel p-4 space-y-2">
           <div className="mono text-[8px] text-white tracking-widest">HOW DATA FLOWS</div>
           <div className="mono text-[9px] text-dim leading-loose">
-            <span className="text-white">6:00 AM IST</span> → Scheduler fires both collectors simultaneously<br />
-            <span className="text-white">Collector</span> → HTTP GET to govt portal → parse HTML/JSON → validate (no zeros, no missing districts)<br />
+            <span className="text-white">Sunday 6:00 AM IST</span> → Scheduler fires all collectors simultaneously<br />
+            <span className="text-white">Collector</span> → HTTP/Playwright to govt portal → parse HTML/JSON → validate<br />
             <span className="text-white">On success</span> → write to <code className="text-blue">scheme_progress</code> table → gap_calculator updates all %s<br />
             <span className="text-white">On failure</span> → write FAILED to <code className="text-blue">data_sync_log</code> → dashboard shows previous snapshot with its date<br />
             <span className="text-white">You</span> → see "Updated 6 hours ago" on each data card, not silently stale data

@@ -246,6 +246,17 @@ SCHEMES = [
         "source_url": "https://doner.gov.in",
         "description": "Development of border districts — Kupwara, Baramulla, Poonch, Rajouri etc.",
     },
+    {
+        "name": "Direct Benefit Transfer",
+        "code": "DBT",
+        "scheme_type": SchemeType.CENTRAL,
+        "dept_code": "FINANCE",
+        "total_outlay": 0,
+        "start_year": 2013,
+        "end_year": None,
+        "source_url": "https://dbtbharat.gov.in",
+        "description": "Direct cash transfers to beneficiaries bank accounts",
+    },
 ]
 
 

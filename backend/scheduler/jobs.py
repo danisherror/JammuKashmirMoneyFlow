@@ -12,6 +12,9 @@ from config import get_settings
 from database.connection import SyncSessionLocal
 from collectors.mgnrega_collector import MGNREGACollector
 from collectors.jjm_collector import JJMCollector
+from collectors.pmay_collector import PMAYCollector
+from collectors.dbt_collector import DBTCollector
+from collectors.tenders_collector import TendersCollector
 from processors.gap_calculator import recalculate_all_gaps
 
 settings = get_settings()
@@ -46,14 +49,29 @@ def run_jjm():
     _run_collector(JJMCollector)
 
 
+def run_pmay():
+    logger.info("⏰ Scheduler: PMAY collection starting")
+    _run_collector(PMAYCollector)
+
+def run_dbt():
+    logger.info("⏰ Scheduler: DBT collection starting")
+    _run_collector(DBTCollector)
+
+def run_tenders():
+    logger.info("⏰ Scheduler: Tenders collection starting")
+    _run_collector(TendersCollector)
+
 def run_all_daily():
     """
-    Master daily job — runs all Phase 1 collectors.
+    Master daily job — runs all collectors.
     Each runs independently so one failure doesn't block others.
     """
     logger.info("⏰ Scheduler: Daily collection run starting")
     run_mgnrega()
     run_jjm()
+    run_pmay()
+    run_dbt()
+    run_tenders()
     logger.info("⏰ Scheduler: Daily collection run complete")
 
 
@@ -64,23 +82,24 @@ def create_scheduler() -> BackgroundScheduler:
         logger.warning("Scheduler DISABLED (SCHEDULER_ENABLED=false). No auto-updates will run.")
         return scheduler
 
-    # Daily run at 6:00 AM IST
+    # Weekly run at 6:00 AM IST on Sunday
     scheduler.add_job(
         run_all_daily,
         trigger=CronTrigger(
+            day_of_week="sun",
             hour=settings.mgnrega_fetch_hour,
             minute=0,
             timezone="Asia/Kolkata",
         ),
-        id="daily_all_collectors",
-        name="Daily: All Phase-1 Collectors",
+        id="weekly_all_collectors",
+        name="Weekly: All Collectors",
         replace_existing=True,
         misfire_grace_time=3600,    # if server was down, run within 1 hour of missed time
     )
 
     logger.info(
         f"Scheduler ready. "
-        f"Daily run at {settings.mgnrega_fetch_hour}:00 IST. "
+        f"Weekly run on Sunday at {settings.mgnrega_fetch_hour}:00 IST. "
         f"Jobs: {[j.name for j in scheduler.get_jobs()]}"
     )
     return scheduler
