@@ -53,16 +53,21 @@ async def get_sync_status(db: AsyncSession = Depends(get_db)):
         )
     )).scalars().all()
 
+    # Fetch last success for all collectors in one query
+    success_subq = (
+        select(
+            DataSyncLog.collector_name,
+            func.max(DataSyncLog.finished_at).label("last_success")
+        )
+        .where(DataSyncLog.status == CollectorStatus.SUCCESS)
+        .group_by(DataSyncLog.collector_name)
+    )
+    success_rows = (await db.execute(success_subq)).all()
+    success_map = {row.collector_name: row.last_success for row in success_rows}
+
     results = []
     for log in rows:
-        # Find last successful run
-        last_success_result = await db.execute(
-            select(func.max(DataSyncLog.finished_at)).where(
-                DataSyncLog.collector_name == log.collector_name,
-                DataSyncLog.status == CollectorStatus.SUCCESS,
-            )
-        )
-        last_success = last_success_result.scalar()
+        last_success = success_map.get(log.collector_name)
         is_healthy = log.status == CollectorStatus.SUCCESS
 
         results.append(SyncStatusItem(

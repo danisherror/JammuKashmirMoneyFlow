@@ -92,30 +92,37 @@ async def get_district_detail(
     from database.models import Scheme, Department
     from api.schemas import SchemeDistrictProgress
 
-    latest_snapshots = (await db.execute(
-        select(SchemeProgress.scheme_id, func.max(SchemeProgress.snapshot_date).label("latest"))
+    # Use a subquery to find the latest snapshot date for each scheme in this district
+    subq = (
+        select(
+            SchemeProgress.scheme_id,
+            func.max(SchemeProgress.snapshot_date).label("latest")
+        )
         .where(
             SchemeProgress.district_id == district_id,
             SchemeProgress.financial_year == financial_year,
         )
         .group_by(SchemeProgress.scheme_id)
+        .subquery()
+    )
+
+    # Join the subquery with SchemeProgress and Scheme to get the full row
+    sp_rows = (await db.execute(
+        select(SchemeProgress, Scheme)
+        .join(Scheme, SchemeProgress.scheme_id == Scheme.id)
+        .join(
+            subq,
+            (SchemeProgress.scheme_id == subq.c.scheme_id) &
+            (SchemeProgress.snapshot_date == subq.c.latest)
+        )
+        .where(
+            SchemeProgress.district_id == district_id,
+            SchemeProgress.financial_year == financial_year,
+        )
     )).all()
 
     scheme_progress_list = []
-    for scheme_id, latest_date in latest_snapshots:
-        sp = (await db.execute(
-            select(SchemeProgress, Scheme)
-            .join(Scheme, SchemeProgress.scheme_id == Scheme.id)
-            .where(
-                SchemeProgress.district_id == district_id,
-                SchemeProgress.scheme_id == scheme_id,
-                SchemeProgress.snapshot_date == latest_date,
-                SchemeProgress.financial_year == financial_year,
-            )
-        )).one_or_none()
-
-        if sp:
-            progress, scheme = sp
+    for progress, scheme in sp_rows:
             scheme_progress_list.append(SchemeDistrictProgress(
                 district_id=district.id,
                 district_name=district.name,

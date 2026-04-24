@@ -45,7 +45,7 @@ class Department(Base):
     name = Column(String(200), nullable=False)
     code = Column(String(20), unique=True, nullable=False)   # e.g. "PWD", "HEALTH"
     division = Column(SAEnum(DivisionType), nullable=False)
-    parent_id = Column(Integer, ForeignKey("departments.id"), nullable=True)
+    parent_id = Column(Integer, ForeignKey("departments.id"), index=True, nullable=True)
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
@@ -81,7 +81,7 @@ class Scheme(Base):
     name = Column(String(300), nullable=False)
     code = Column(String(50), unique=True, nullable=False)   # e.g. "JJM", "PMAY_G"
     scheme_type = Column(SAEnum(SchemeType), nullable=False)
-    department_id = Column(Integer, ForeignKey("departments.id"), nullable=False)
+    department_id = Column(Integer, ForeignKey("departments.id"), index=True, nullable=False)
     total_outlay = Column(BigInteger, nullable=True)         # in lakhs
     start_year = Column(Integer, nullable=True)
     end_year = Column(Integer, nullable=True)
@@ -106,8 +106,8 @@ class BudgetAllocation(Base):
     __tablename__ = "budget_allocations"
 
     id = Column(Integer, primary_key=True)
-    department_id = Column(Integer, ForeignKey("departments.id"), nullable=False)
-    financial_year = Column(String(10), nullable=False)      # "2024-25"
+    department_id = Column(Integer, ForeignKey("departments.id"), index=True, nullable=False)
+    financial_year = Column(String(10), index=True, nullable=False)      # "2024-25"
     budget_estimate = Column(BigInteger, nullable=False)     # in lakhs — original allocation
     revised_estimate = Column(BigInteger, nullable=True)     # revised mid-year
     actual_previous_year = Column(BigInteger, nullable=True) # last year's actual spend
@@ -128,14 +128,14 @@ class Expenditure(Base):
     __tablename__ = "expenditures"
 
     id = Column(Integer, primary_key=True)
-    department_id = Column(Integer, ForeignKey("departments.id"), nullable=False)
-    financial_year = Column(String(10), nullable=False)
-    month = Column(Integer, nullable=False)                  # 1=April, 12=March (Indian FY)
+    department_id = Column(Integer, ForeignKey("departments.id"), index=True, nullable=False)
+    financial_year = Column(String(10), index=True, nullable=False)
+    month = Column(Integer, index=True, nullable=False)                  # 1=April, 12=March (Indian FY)
     released_amount = Column(BigInteger, nullable=True)      # Finance Dept released
     utilized_amount = Column(BigInteger, nullable=True)      # Actually spent
     is_capital = Column(Boolean, default=False)
     source = Column(String(100), default="cga.nic.in")
-    snapshot_date = Column(Date, nullable=False)
+    snapshot_date = Column(Date, index=True, nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     department = relationship("Department", back_populates="expenditures")
@@ -152,9 +152,9 @@ class SchemeProgress(Base):
     __tablename__ = "scheme_progress"
 
     id = Column(Integer, primary_key=True)
-    scheme_id = Column(Integer, ForeignKey("schemes.id"), nullable=False)
-    district_id = Column(Integer, ForeignKey("districts.id"), nullable=False)
-    financial_year = Column(String(10), nullable=False)
+    scheme_id = Column(Integer, ForeignKey("schemes.id"), index=True, nullable=False)
+    district_id = Column(Integer, ForeignKey("districts.id"), index=True, nullable=False)
+    financial_year = Column(String(10), index=True, nullable=False)
 
     # Physical targets & achievement (units depend on scheme)
     target_physical = Column(Float, nullable=True)           # e.g. 1000 houses
@@ -171,7 +171,7 @@ class SchemeProgress(Base):
     release_pct = Column(Float, nullable=True)               # released / allocated * 100
     physical_pct = Column(Float, nullable=True)              # achieved / target * 100
 
-    snapshot_date = Column(Date, nullable=False)
+    snapshot_date = Column(Date, index=True, nullable=False)
     source = Column(String(100), nullable=True)
     raw_data = Column(JSON, nullable=True)                   # original API response
     created_at = Column(DateTime(timezone=True), server_default=func.now())
@@ -191,19 +191,19 @@ class Tender(Base):
 
     id = Column(Integer, primary_key=True)
     tender_ref = Column(String(100), unique=True, nullable=False)  # portal's own ID
-    department_id = Column(Integer, ForeignKey("departments.id"), nullable=True)
+    department_id = Column(Integer, ForeignKey("departments.id"), index=True, nullable=True)
     department_name_raw = Column(String(300), nullable=True)       # as-scraped, before mapping
     title = Column(Text, nullable=False)
     estimated_cost = Column(BigInteger, nullable=True)             # in lakhs
     awarded_cost = Column(BigInteger, nullable=True)
     contractor_name = Column(String(300), nullable=True)
-    status = Column(String(50), nullable=True)                     # "active","awarded","cancelled"
+    status = Column(String(50), index=True, nullable=True)                     # "active","awarded","cancelled"
     published_date = Column(Date, nullable=True)
     bid_end_date = Column(Date, nullable=True)
     award_date = Column(Date, nullable=True)
     completion_date = Column(Date, nullable=True)
     location = Column(String(200), nullable=True)
-    district_id = Column(Integer, ForeignKey("districts.id"), nullable=True)
+    district_id = Column(Integer, ForeignKey("districts.id"), index=True, nullable=True)
     source_url = Column(String(500), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
@@ -222,9 +222,9 @@ class DBTTransfer(Base):
     __tablename__ = "dbt_transfers"
 
     id = Column(Integer, primary_key=True)
-    scheme_id = Column(Integer, ForeignKey("schemes.id"), nullable=False)
-    district_id = Column(Integer, ForeignKey("districts.id"), nullable=False)
-    financial_year = Column(String(10), nullable=False)
+    scheme_id = Column(Integer, ForeignKey("schemes.id"), index=True, nullable=False)
+    district_id = Column(Integer, ForeignKey("districts.id"), index=True, nullable=False)
+    financial_year = Column(String(10), index=True, nullable=False)
 
     beneficiaries_enrolled = Column(Integer, nullable=True)
     beneficiaries_paid = Column(Integer, nullable=True)
@@ -234,7 +234,7 @@ class DBTTransfer(Base):
     # Last-mile gap (filled by processor)
     last_mile_gap_pct = Column(Float, nullable=True)         # (enrolled - paid) / enrolled * 100
 
-    snapshot_date = Column(Date, nullable=False)
+    snapshot_date = Column(Date, index=True, nullable=False)
     source = Column(String(100), default="dbtbharat.gov.in")
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
@@ -255,7 +255,7 @@ class CAGFinding(Base):
     id = Column(Integer, primary_key=True)
     report_year = Column(Integer, nullable=False)
     report_title = Column(String(500), nullable=True)
-    department_id = Column(Integer, ForeignKey("departments.id"), nullable=True)
+    department_id = Column(Integer, ForeignKey("departments.id"), index=True, nullable=True)
     department_name_raw = Column(String(300), nullable=True)
 
     finding_raw = Column(Text, nullable=False)               # extracted PDF paragraph
@@ -278,8 +278,8 @@ class DataSyncLog(Base):
     __tablename__ = "data_sync_log"
 
     id = Column(Integer, primary_key=True)
-    collector_name = Column(String(100), nullable=False)     # "mgnrega_collector"
-    status = Column(SAEnum(CollectorStatus), nullable=False)
+    collector_name = Column(String(100), index=True, nullable=False)     # "mgnrega_collector"
+    status = Column(SAEnum(CollectorStatus), index=True, nullable=False)
     started_at = Column(DateTime(timezone=True), nullable=False)
     finished_at = Column(DateTime(timezone=True), nullable=True)
     records_fetched = Column(Integer, default=0)

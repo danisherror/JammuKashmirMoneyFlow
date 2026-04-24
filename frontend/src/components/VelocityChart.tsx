@@ -17,6 +17,24 @@ const VERDICT_CONFIG = {
   'NO DATA':   { color: '#5a7a9a', bg: 'rgba(90,122,154,0.1)', border: 'rgba(90,122,154,0.3)', icon: '—' },
 }
 
+const CustomTooltip = ({ active, payload, label }: any) => {
+  if (!active || !payload?.length) return null
+  return (
+    <div className="mono text-[9px] p-3 space-y-1"
+      style={{ background: '#0d1520', border: '1px solid #1a2a3a', minWidth: 180 }}>
+      <div className="text-dim tracking-widest mb-2">{label}</div>
+      {payload.map((p: any) => (
+        p.value != null && (
+          <div key={p.name} className="flex justify-between gap-4">
+            <span style={{ color: p.color }}>{p.name.toUpperCase()}</span>
+            <span className="text-white">{fmtLakhs(p.value)}</span>
+          </div>
+        )
+      ))}
+    </div>
+  )
+}
+
 export default function VelocityChart({ velocity }: VelocityChartProps) {
   const cfg = VERDICT_CONFIG[velocity.verdict] ?? VERDICT_CONFIG['NO DATA']
 
@@ -39,24 +57,6 @@ export default function VelocityChart({ velocity }: VelocityChartProps) {
       allocated: velocity.total_allocated_lakhs,
       projected: velocity.projected_utilized_lakhs,
     })
-  }
-
-  const CustomTooltip = ({ active, payload, label }: any) => {
-    if (!active || !payload?.length) return null
-    return (
-      <div className="mono text-[9px] p-3 space-y-1"
-        style={{ background: '#0d1520', border: '1px solid #1a2a3a', minWidth: 180 }}>
-        <div className="text-dim tracking-widest mb-2">{label}</div>
-        {payload.map((p: any) => (
-          p.value != null && (
-            <div key={p.name} className="flex justify-between gap-4">
-              <span style={{ color: p.color }}>{p.name.toUpperCase()}</span>
-              <span className="text-white">{fmtLakhs(p.value)}</span>
-            </div>
-          )
-        ))}
-      </div>
-    )
   }
 
   return (
