@@ -2,16 +2,16 @@
 Scheme routes — MGNREGA, JJM, PMAY, etc.
 GET /api/v1/schemes
 GET /api/v1/schemes/{id}
-GET /api/v1/schemes/{id}/districts
-GET /api/v1/schemes/category/{type}
+GET /api/v1/schemes/{id}/history
 """
 from fastapi import APIRouter, Depends, Query, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, and_
+from datetime import date, timedelta
 
 from database.connection import get_db
 from database.models import Scheme, SchemeProgress, District, Department
-from api.schemas import SchemeSummary, SchemeDetail, SchemeDistrictProgress
+from api.schemas import SchemeSummary, SchemeDetail, SchemeDistrictProgress, SchemeHistoryPoint, SchemeVelocity
 
 router = APIRouter(prefix="/schemes", tags=["Schemes"])
 
@@ -154,4 +154,103 @@ async def get_scheme_detail(
         end_year=scheme.end_year,
         source_url=scheme.source_url,
         district_progress=district_progress,
+    )
+
+
+@router.get("/{scheme_id}/history", response_model=SchemeVelocity)
+async def get_scheme_velocity(
+    scheme_id: int,
+    financial_year: str = Query("2024-25"),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Time-series of spending for a scheme + run-rate projection to March 31st.
+
+    Math:
+      daily_run_rate = total_utilized_so_far / days_elapsed_in_FY
+      projected_utilized = current_utilized + (daily_run_rate * days_remaining)
+      on_track = projected_utilized >= total_allocated
+    """
+    # Fetch scheme
+    scheme_row = await db.execute(select(Scheme).where(Scheme.id == scheme_id))
+    scheme = scheme_row.scalar_one_or_none()
+    if not scheme:
+        raise HTTPException(status_code=404, detail="Scheme not found")
+
+    # Pull all snapshots aggregated by date (sum across districts)
+    rows = (await db.execute(
+        select(
+            SchemeProgress.snapshot_date,
+            func.sum(SchemeProgress.funds_allocated).label("allocated"),
+            func.sum(SchemeProgress.funds_utilized).label("utilized"),
+        )
+        .where(
+            SchemeProgress.scheme_id == scheme_id,
+            SchemeProgress.financial_year == financial_year,
+        )
+        .group_by(SchemeProgress.snapshot_date)
+        .order_by(SchemeProgress.snapshot_date.asc())
+    )).all()
+
+    history = [
+        SchemeHistoryPoint(
+            snapshot_date=r.snapshot_date,
+            funds_allocated_lakhs=int(r.allocated or 0),
+            funds_utilized_lakhs=int(r.utilized or 0),
+            utilization_pct=round((r.utilized / r.allocated * 100), 2)
+            if r.allocated and r.allocated > 0 else None,
+        )
+        for r in rows
+    ]
+
+    # ── Projection math ────────────────────────────────────────────────────────
+    fy_start_year = int(financial_year.split("-")[0])
+    fy_start = date(fy_start_year, 4, 1)          # April 1
+    fy_end   = date(fy_start_year + 1, 3, 31)     # March 31
+
+    today = date.today()
+    days_elapsed  = max((today - fy_start).days, 1)
+    days_remaining = max((fy_end - today).days, 0)
+
+    daily_run_rate   = None
+    projected        = None
+    on_track         = None
+    surrender_risk   = None
+    verdict          = "NO DATA"
+
+    if history:
+        latest = history[-1]
+        current_utilized  = latest.funds_utilized_lakhs
+        total_allocated   = latest.funds_allocated_lakhs
+
+        if days_elapsed > 0:
+            daily_run_rate = current_utilized / days_elapsed
+
+        if daily_run_rate is not None:
+            projected = int(current_utilized + (daily_run_rate * days_remaining))
+            on_track  = projected >= total_allocated
+
+            if on_track:
+                verdict = "ON TRACK"
+                surrender_risk = 0
+            else:
+                shortfall_pct = (total_allocated - projected) / total_allocated * 100 if total_allocated else 0
+                surrender_risk = max(0, total_allocated - projected)
+                verdict = "CRITICAL" if shortfall_pct > 40 else "AT RISK"
+    else:
+        total_allocated = None
+
+    return SchemeVelocity(
+        scheme_id=scheme_id,
+        scheme_name=scheme.name,
+        financial_year=financial_year,
+        history=history,
+        days_elapsed=days_elapsed,
+        days_remaining=days_remaining,
+        daily_run_rate_lakhs=round(daily_run_rate, 2) if daily_run_rate else None,
+        projected_utilized_lakhs=projected,
+        total_allocated_lakhs=total_allocated,
+        on_track=on_track,
+        surrender_risk_lakhs=surrender_risk,
+        verdict=verdict,
     )

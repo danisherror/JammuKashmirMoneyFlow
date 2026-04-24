@@ -119,6 +119,40 @@ class SchemeDetail(SchemeSummary):
     district_progress: list[SchemeDistrictProgress] = []
 
 
+class SchemeHistoryPoint(BaseModel):
+    """One data point in the spending velocity time-series."""
+    snapshot_date: date
+    funds_allocated_lakhs: int
+    funds_utilized_lakhs: int
+    utilization_pct: Optional[float]
+
+    class Config:
+        from_attributes = True
+
+
+class SchemeVelocity(BaseModel):
+    """Full velocity + projection payload for a scheme."""
+    scheme_id: int
+    scheme_name: str
+    financial_year: str
+    history: list[SchemeHistoryPoint]
+
+    # Run-rate maths
+    days_elapsed: int                         # days since FY start (Apr 1)
+    days_remaining: int                       # days until Mar 31
+    daily_run_rate_lakhs: Optional[float]     # average lakhs spent per day
+    projected_utilized_lakhs: Optional[int]   # if run-rate holds
+    total_allocated_lakhs: Optional[int]
+
+    # Verdict
+    on_track: Optional[bool]                  # True if projected >= allocated
+    surrender_risk_lakhs: Optional[int]       # how much may be surrendered
+    verdict: str                              # "ON TRACK" | "AT RISK" | "CRITICAL" | "NO DATA"
+
+    class Config:
+        from_attributes = True
+
+
 # ── Districts ─────────────────────────────────────────────────────────────────
 
 class DistrictHeatmapItem(BaseModel):

@@ -4,12 +4,13 @@ import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell
 } from 'recharts'
 import { useAppStore } from '../store'
-import { fetchSchemeDetail } from '../lib/api'
+import { fetchSchemeDetail, fetchSchemeHistory } from '../lib/api'
 import { fmtLakhs, fmtPct, utilColor, schemeBadge, schemeTypeLabel } from '../lib/utils'
 import UtilBar from '../components/UtilBar'
 import PageHeader from '../components/PageHeader'
 import ErrorBox from '../components/ErrorBox'
 import MapWidget from '../components/MapWidget'
+import VelocityChart from '../components/VelocityChart'
 import { ChevronLeft, ExternalLink } from 'lucide-react'
 
 export default function SchemeDetail() {
@@ -19,6 +20,12 @@ export default function SchemeDetail() {
   const { data, isLoading, isError } = useQuery({
     queryKey: ['scheme-detail', id, financialYear],
     queryFn: () => fetchSchemeDetail(Number(id), financialYear),
+    enabled: !!id,
+  })
+
+  const { data: velocity } = useQuery({
+    queryKey: ['scheme-velocity', id, financialYear],
+    queryFn: () => fetchSchemeHistory(Number(id), financialYear),
     enabled: !!id,
   })
 
@@ -89,6 +96,9 @@ export default function SchemeDetail() {
                 </div>
               ))}
             </div>
+
+            {/* Velocity & Projection Chart */}
+            {velocity && <VelocityChart velocity={velocity} />}
 
             {/* Overall bar */}
             <div className="panel">
