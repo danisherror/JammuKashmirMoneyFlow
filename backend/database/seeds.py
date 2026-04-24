@@ -58,6 +58,30 @@ BUDGET_2024_25 = {
     "ANIMAL":     {"budget_estimate": 44000,  "is_capital": False},
 }
 
+# Estimated budget allocations FY2023-24 (in lakhs) — scaled down by ~10% for demonstration
+BUDGET_2023_24 = {
+    "PWD":        {"budget_estimate": 405000, "is_capital": True},
+    "HEALTH":     {"budget_estimate": 256500, "is_capital": False},
+    "SCHOOLEDU":  {"budget_estimate": 288000, "is_capital": False},
+    "HIGHEREDU":  {"budget_estimate": 85500,  "is_capital": False},
+    "JALSHAKTI":  {"budget_estimate": 342000, "is_capital": True},
+    "PDD":        {"budget_estimate": 265500, "is_capital": True},
+    "AGRI":       {"budget_estimate": 112500, "is_capital": False},
+    "HORTI":      {"budget_estimate": 88200,  "is_capital": False},
+    "RDPR":       {"budget_estimate": 189000, "is_capital": False},
+    "ULB":        {"budget_estimate": 130500, "is_capital": True},
+    "SOCIALWEL":  {"budget_estimate": 78300,  "is_capital": False},
+    "POLICE":     {"budget_estimate": 378000, "is_capital": False},
+    "REVENUE":    {"budget_estimate": 61200,  "is_capital": False},
+    "INDUSTRIES": {"budget_estimate": 49500,  "is_capital": False},
+    "TOURISM":    {"budget_estimate": 37800,  "is_capital": True},
+    "FOREST":     {"budget_estimate": 34200,  "is_capital": False},
+    "FINANCE":    {"budget_estimate": 801000, "is_capital": False},
+    "GAD":        {"budget_estimate": 64800,  "is_capital": False},
+    "LABOUR":     {"budget_estimate": 27900,  "is_capital": False},
+    "ANIMAL":     {"budget_estimate": 39600,  "is_capital": False},
+}
+
 
 # ── Districts ─────────────────────────────────────────────────────────────────
 
@@ -243,32 +267,35 @@ async def seed_departments(db: AsyncSession):
 
     for dept_data in DEPARTMENTS:
         code = dept_data["code"]
-        if code not in BUDGET_2024_25:
-            continue
-        result = await db.execute(select(Department).where(Department.code == code))
-        dept = result.scalar_one_or_none()
-        if not dept:
-            continue
+        
+        # Seed both years
+        for fy, budget_dict in [("2024-25", BUDGET_2024_25), ("2023-24", BUDGET_2023_24)]:
+            if code not in budget_dict:
+                continue
+            result = await db.execute(select(Department).where(Department.code == code))
+            dept = result.scalar_one_or_none()
+            if not dept:
+                continue
 
-        # Check if allocation already exists
-        alloc_result = await db.execute(
-            select(BudgetAllocation).where(
-                BudgetAllocation.department_id == dept.id,
-                BudgetAllocation.financial_year == "2024-25"
+            # Check if allocation already exists
+            alloc_result = await db.execute(
+                select(BudgetAllocation).where(
+                    BudgetAllocation.department_id == dept.id,
+                    BudgetAllocation.financial_year == fy
+                )
             )
-        )
-        if alloc_result.scalar_one_or_none():
-            continue
+            if alloc_result.scalar_one_or_none():
+                continue
 
-        budget = BUDGET_2024_25[code]
-        alloc = BudgetAllocation(
-            department_id=dept.id,
-            financial_year="2024-25",
-            budget_estimate=budget["budget_estimate"],
-            is_capital=budget["is_capital"],
-            source="jkfinance.nic.in",
-        )
-        db.add(alloc)
+            budget = budget_dict[code]
+            alloc = BudgetAllocation(
+                department_id=dept.id,
+                financial_year=fy,
+                budget_estimate=budget["budget_estimate"],
+                is_capital=budget["is_capital"],
+                source="jkfinance.nic.in",
+            )
+            db.add(alloc)
 
 
 async def seed_districts(db: AsyncSession):

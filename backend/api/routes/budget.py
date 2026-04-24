@@ -30,12 +30,8 @@ async def get_budget_overview(
     result = await db.execute(
         select(
             func.sum(BudgetAllocation.budget_estimate).label("total"),
-            func.sum(
-                BudgetAllocation.budget_estimate.filter(BudgetAllocation.is_capital == True)
-            ).label("capital"),
-            func.sum(
-                BudgetAllocation.budget_estimate.filter(BudgetAllocation.is_capital == False)
-            ).label("revenue"),
+            func.sum(BudgetAllocation.budget_estimate).filter(BudgetAllocation.is_capital == True).label("capital"),
+            func.sum(BudgetAllocation.budget_estimate).filter(BudgetAllocation.is_capital == False).label("revenue"),
             func.count(BudgetAllocation.department_id.distinct()).label("dept_count"),
         ).where(BudgetAllocation.financial_year == financial_year)
     )
