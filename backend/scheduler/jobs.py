@@ -1,6 +1,8 @@
 """
 APScheduler job definitions.
-All collector jobs live here. Scheduler is started inside FastAPI lifespan.
+Each collector job runs independently — a failure in one does NOT
+affect others. Failures are logged to data_sync_log so the
+/alerts/sync-status endpoint can surface them to the dashboard.
 """
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
@@ -15,81 +17,70 @@ from processors.gap_calculator import recalculate_all_gaps
 settings = get_settings()
 
 
-def run_mgnrega():
-    """Daily job: fetch MGNREGA J&K data from nreganarayan.nic.in"""
-    logger.info("⏰ Scheduler: Starting MGNREGA collection")
+def _run_collector(collector_class, **kwargs):
+    """
+    Helper that opens a DB session, runs the collector, recalculates gaps,
+    and always closes the session — even on exception.
+    The collector's own run() method handles logging to data_sync_log.
+    """
     db = SyncSessionLocal()
     try:
-        collector = MGNREGACollector(db)
-        collector.run()
+        collector = collector_class(db, **kwargs)
+        collector.run()         # raises on failure; run() writes FAILED to sync_log
         recalculate_all_gaps(db)
+    except Exception as e:
+        # run() already logged this to data_sync_log.
+        # We log here so it also appears in docker logs.
+        logger.error(f"[scheduler] {collector_class.__name__} failed: {e}")
     finally:
         db.close()
+
+
+def run_mgnrega():
+    logger.info("⏰ Scheduler: MGNREGA collection starting")
+    _run_collector(MGNREGACollector)
 
 
 def run_jjm():
-    """Daily job: fetch JJM J&K data from ejalshakti.gov.in"""
-    logger.info("⏰ Scheduler: Starting JJM collection")
-    db = SyncSessionLocal()
-    try:
-        collector = JJMCollector(db)
-        collector.run()
-        recalculate_all_gaps(db)
-    finally:
-        db.close()
+    logger.info("⏰ Scheduler: JJM collection starting")
+    _run_collector(JJMCollector)
 
 
 def run_all_daily():
     """
-    Master daily job — runs all daily collectors in sequence.
-    Runs at 6:00 AM IST (00:30 UTC).
+    Master daily job — runs all Phase 1 collectors.
+    Each runs independently so one failure doesn't block others.
     """
-    logger.info("⏰ Scheduler: Running ALL daily collectors")
+    logger.info("⏰ Scheduler: Daily collection run starting")
     run_mgnrega()
     run_jjm()
-    # Phase 2 collectors will be added here:
-    # run_pmay()
-    # run_dbt()
+    logger.info("⏰ Scheduler: Daily collection run complete")
 
 
 def create_scheduler() -> BackgroundScheduler:
-    """
-    Build and return a configured APScheduler instance.
-    Called once during FastAPI startup.
-    """
     scheduler = BackgroundScheduler(timezone="Asia/Kolkata")
 
     if not settings.scheduler_enabled:
-        logger.warning("Scheduler is DISABLED (SCHEDULER_ENABLED=false). No auto-updates.")
+        logger.warning("Scheduler DISABLED (SCHEDULER_ENABLED=false). No auto-updates will run.")
         return scheduler
 
-    # ── Daily jobs (6:00 AM IST) ──────────────────────────────────────────────
+    # Daily run at 6:00 AM IST
     scheduler.add_job(
         run_all_daily,
-        trigger=CronTrigger(hour=settings.mgnrega_fetch_hour, minute=0, timezone="Asia/Kolkata"),
+        trigger=CronTrigger(
+            hour=settings.mgnrega_fetch_hour,
+            minute=0,
+            timezone="Asia/Kolkata",
+        ),
         id="daily_all_collectors",
-        name="Daily: All Collectors",
+        name="Daily: All Phase-1 Collectors",
         replace_existing=True,
-        misfire_grace_time=3600,    # if missed, run within 1 hour
-    )
-
-    # ── Individual jobs (can be triggered manually via API too) ───────────────
-    scheduler.add_job(
-        run_mgnrega,
-        id="mgnrega_manual",
-        name="MGNREGA Collector",
-        replace_existing=True,
-    )
-
-    scheduler.add_job(
-        run_jjm,
-        id="jjm_manual",
-        name="JJM Collector",
-        replace_existing=True,
+        misfire_grace_time=3600,    # if server was down, run within 1 hour of missed time
     )
 
     logger.info(
-        f"Scheduler configured. Daily run at {settings.mgnrega_fetch_hour}:00 IST. "
+        f"Scheduler ready. "
+        f"Daily run at {settings.mgnrega_fetch_hour}:00 IST. "
         f"Jobs: {[j.name for j in scheduler.get_jobs()]}"
     )
     return scheduler

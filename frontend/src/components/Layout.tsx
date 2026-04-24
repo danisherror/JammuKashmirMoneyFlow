@@ -5,6 +5,7 @@ import {
   MapPin, Bell, Database, ChevronLeft, ChevronRight
 } from 'lucide-react'
 import clsx from 'clsx'
+import DataFreshness from './DataFreshness'
 
 const NAV = [
   { to: '/',            icon: LayoutDashboard, label: 'Overview'    },
@@ -47,7 +48,7 @@ export default function Layout() {
             <select
               value={financialYear}
               onChange={e => setFinancialYear(e.target.value)}
-              className="w-full mono text-[10px] bg-transparent text-gold border px-2 py-1"
+              className="w-full mono text-[10px] bg-transparent text-gold border px-2 py-1 outline-none"
               style={{ borderColor: '#1a2a3a' }}
             >
               <option value="2024-25">2024-25</option>
@@ -89,8 +90,12 @@ export default function Layout() {
       </aside>
 
       {/* Main content */}
-      <div className="flex-1 overflow-auto">
-        <Outlet />
+      <div className="flex-1 overflow-auto flex flex-col">
+        {/* Data freshness strip — always visible on every page */}
+        <DataFreshness />
+        <div className="flex-1 overflow-auto">
+          <Outlet />
+        </div>
       </div>
     </div>
   )

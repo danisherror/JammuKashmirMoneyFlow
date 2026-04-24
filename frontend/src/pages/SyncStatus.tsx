@@ -1,128 +1,266 @@
 import { useQuery, useMutation } from '@tanstack/react-query'
 import { toast } from 'react-hot-toast'
+import { formatDistanceToNow, parseISO } from 'date-fns'
 import { fetchSyncStatus, triggerCollector } from '../lib/api'
 import PageHeader from '../components/PageHeader'
 import ErrorBox from '../components/ErrorBox'
-import { formatDistanceToNow } from 'date-fns'
+
+interface CollectorDef {
+  name:        string
+  label:       string
+  trigger_key: string | null
+  source:      string
+  source_url:  string
+  schedule:    string
+  phase:       number
+}
+
+const COLLECTORS: CollectorDef[] = [
+  {
+    name:        'mgnrega_collector',
+    label:       'MGNREGA',
+    trigger_key: 'mgnrega',
+    source:      'nreganarayan.nic.in',
+    source_url:  'https://nreganarayan.nic.in/netnrega/home.aspx',
+    schedule:    'Daily 6:00 AM IST',
+    phase:       1,
+  },
+  {
+    name:        'jjm_collector',
+    label:       'JAL JEEVAN MISSION',
+    trigger_key: 'jjm',
+    source:      'ejalshakti.gov.in',
+    source_url:  'https://ejalshakti.gov.in/jjmreport/JJMIndia.aspx',
+    schedule:    'Daily 6:00 AM IST',
+    phase:       1,
+  },
+  {
+    name:        'pmay_collector',
+    label:       'PM AWAS YOJANA',
+    trigger_key: null,
+    source:      'pmayg.nic.in',
+    source_url:  'https://pmayg.nic.in',
+    schedule:    'Weekly (Phase 2)',
+    phase:       2,
+  },
+  {
+    name:        'dbt_collector',
+    label:       'DBT TRANSFERS',
+    trigger_key: null,
+    source:      'dbtbharat.gov.in',
+    source_url:  'https://dbtbharat.gov.in',
+    schedule:    'Daily (Phase 2)',
+    phase:       2,
+  },
+  {
+    name:        'tender_collector',
+    label:       'TENDERS',
+    trigger_key: null,
+    source:      'jktenders.gov.in',
+    source_url:  'https://jktenders.gov.in',
+    schedule:    'Daily (Phase 2)',
+    phase:       2,
+  },
+  {
+    name:        'cag_collector',
+    label:       'CAG AUDIT REPORTS',
+    trigger_key: null,
+    source:      'cag.gov.in',
+    source_url:  'https://cag.gov.in/en/audit-report?tags=Jammu+%26+Kashmir',
+    schedule:    'Monthly (Phase 2)',
+    phase:       2,
+  },
+]
+
+function timeAgo(iso: string | null): string {
+  if (!iso) return 'Never'
+  try { return formatDistanceToNow(parseISO(iso), { addSuffix: true }) }
+  catch { return iso }
+}
 
 export default function SyncStatus() {
   const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ['sync-status'],
-    queryFn: fetchSyncStatus,
-    refetchInterval: 30000,   // poll every 30s
+    queryFn:  fetchSyncStatus,
+    refetchInterval: 30_000,
   })
 
   const trigger = useMutation({
     mutationFn: triggerCollector,
     onSuccess: (_, name) => {
-      toast.success(`${name} collector triggered`)
-      setTimeout(() => refetch(), 3000)
+      toast.success(`${name} triggered — check logs in ~30s`)
+      setTimeout(() => refetch(), 5000)
     },
-    onError: () => toast.error('Failed to trigger collector'),
+    onError: (err: any) => {
+      toast.error(err?.response?.data?.detail ?? 'Trigger failed')
+    },
   })
 
-  const KNOWN_COLLECTORS = [
-    { name: 'mgnrega_collector', label: 'MGNREGA', trigger_key: 'mgnrega', source: 'nreganarayan.nic.in', schedule: 'Daily 6AM IST' },
-    { name: 'jjm_collector',     label: 'JAL JEEVAN MISSION', trigger_key: 'jjm', source: 'ejalshakti.gov.in', schedule: 'Daily 6AM IST' },
-    // Future collectors listed but not yet built
-    { name: 'pmay_collector',    label: 'PM AWAS YOJANA', trigger_key: null, source: 'pmayg.nic.in', schedule: 'Weekly (Phase 2)' },
-    { name: 'dbt_collector',     label: 'DBT TRACKER', trigger_key: null, source: 'dbtbharat.gov.in', schedule: 'Daily (Phase 2)' },
-    { name: 'tender_collector',  label: 'TENDERS', trigger_key: null, source: 'jktenders.gov.in', schedule: 'Daily (Phase 2)' },
-    { name: 'cag_collector',     label: 'CAG REPORTS', trigger_key: null, source: 'cag.gov.in', schedule: 'Monthly (Phase 2)' },
-  ]
-
-  const statusByName = Object.fromEntries((data ?? []).map(s => [s.collector_name, s]))
+  const byName = Object.fromEntries((data ?? []).map(s => [s.collector_name, s]))
 
   return (
     <div>
       <PageHeader
         title="SYNC STATUS"
-        subtitle="DATA COLLECTOR HEALTH — AUTO-UPDATES EVERY 30S"
+        subtitle="LIVE DATA COLLECTOR HEALTH — AUTO-POLLS EVERY 30S"
         right={
-          <button onClick={() => refetch()}
+          <button
+            onClick={() => refetch()}
             className="mono text-[9px] text-dim hover:text-white border px-3 py-1.5 transition-colors"
-            style={{ borderColor: '#1a2a3a' }}>
+            style={{ borderColor: '#1a2a3a' }}
+          >
             ⟳ REFRESH
           </button>
         }
       />
 
-      <div className="p-6 space-y-4">
-        {isError && <ErrorBox />}
+      <div className="p-6 space-y-6">
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {KNOWN_COLLECTORS.map(col => {
-            const status = statusByName[col.name]
-            const isBuilt = col.trigger_key !== null
-            const isHealthy = status?.is_healthy ?? false
-            const borderColor = !isBuilt ? '#1a2a3a' : isHealthy ? 'rgba(0,255,136,0.3)' : 'rgba(255,51,102,0.3)'
-            const dotColor   = !isBuilt ? '#1a2a3a' : isHealthy ? '#00ff88' : '#ff3366'
-            const statusText = !isBuilt ? 'PHASE 2' : status ? status.status.toUpperCase() : 'NEVER RUN'
+        {/* Important notice */}
+        <div className="panel p-4" style={{ borderColor: 'rgba(0,170,255,0.3)' }}>
+          <div className="mono text-[9px] text-blue leading-relaxed">
+            ℹ️ <span className="text-white">No fallback / hardcoded data.</span>{' '}
+            If a collector fails, the dashboard shows the last successful snapshot
+            (clearly labelled with its date) or nothing at all.
+            An empty chart means the data was not yet fetched — not that it's zero.
+          </div>
+        </div>
 
-            return (
-              <div key={col.name} className="panel" style={{ borderColor }}>
-                <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 2, background: dotColor }} />
+        {isError && <ErrorBox message="Could not reach /alerts/sync-status. Is the API running?" />}
 
-                <div className="flex items-start justify-between mb-3">
-                  <div>
-                    <div className="mono text-[11px] font-bold text-white">{col.label}</div>
-                    <div className="mono text-[8px] text-dim mt-0.5">{col.source}</div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <div className="w-2 h-2 rounded-full" style={{ background: dotColor, boxShadow: `0 0 6px ${dotColor}` }} />
-                    <span className="mono text-[8px]" style={{ color: dotColor }}>{statusText}</span>
-                  </div>
-                </div>
+        {/* Phase 1 collectors */}
+        <div>
+          <div className="mono text-[8px] text-dim tracking-widest mb-3 flex items-center gap-2">
+            PHASE 1 — ACTIVE COLLECTORS
+            <div style={{ flex: 1, height: 1, background: '#1a2a3a' }} />
+          </div>
 
-                <div className="grid grid-cols-2 gap-3 mb-3 mono text-[8px]">
-                  <div>
-                    <div className="text-dim mb-0.5">SCHEDULE</div>
-                    <div className="text-white">{col.schedule}</div>
-                  </div>
-                  <div>
-                    <div className="text-dim mb-0.5">LAST RUN</div>
-                    <div className="text-white">
-                      {status?.last_run
-                        ? formatDistanceToNow(new Date(status.last_run), { addSuffix: true })
-                        : '—'}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {COLLECTORS.filter(c => c.phase === 1).map(col => {
+              const s        = byName[col.name]
+              const healthy  = s?.is_healthy ?? false
+              const status   = s?.status ?? 'NEVER RUN'
+              const dotColor = healthy ? '#00ff88' : s ? '#ff3366' : '#5a7a9a'
+              const borderColor = healthy
+                ? 'rgba(0,255,136,0.25)'
+                : s ? 'rgba(255,51,102,0.25)' : '#1a2a3a'
+
+              return (
+                <div key={col.name} className="panel space-y-4" style={{ borderColor }}>
+                  <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 2, background: dotColor }} />
+
+                  {/* Header */}
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <div className="mono text-[11px] font-bold text-white">{col.label}</div>
+                      <a
+                        href={col.source_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="mono text-[8px] text-blue hover:underline"
+                      >
+                        {col.source} ↗
+                      </a>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div
+                        className="w-2 h-2 rounded-full"
+                        style={{ background: dotColor, boxShadow: `0 0 6px ${dotColor}` }}
+                      />
+                      <span className="mono text-[8px]" style={{ color: dotColor }}>
+                        {status.toUpperCase()}
+                      </span>
                     </div>
                   </div>
-                  <div>
-                    <div className="text-dim mb-0.5">RECORDS (LAST)</div>
-                    <div className="text-white">{status?.records_last_run ?? '—'}</div>
+
+                  {/* Stats grid */}
+                  <div className="grid grid-cols-2 gap-x-6 gap-y-2">
+                    {[
+                      { label: 'SCHEDULE',       val: col.schedule },
+                      { label: 'LAST RUN',        val: timeAgo(s?.last_run ?? null) },
+                      { label: 'LAST SUCCESS',    val: timeAgo(s?.last_success ?? null) },
+                      { label: 'RECORDS (LAST)',  val: s ? String(s.records_last_run) : '—' },
+                    ].map(({ label, val }) => (
+                      <div key={label}>
+                        <div className="mono text-[7px] text-dim tracking-widest mb-0.5">{label}</div>
+                        <div className="mono text-[9px] text-white">{val}</div>
+                      </div>
+                    ))}
                   </div>
-                  <div>
-                    <div className="text-dim mb-0.5">LAST SUCCESS</div>
-                    <div className="text-white">
-                      {status?.last_success
-                        ? formatDistanceToNow(new Date(status.last_success), { addSuffix: true })
-                        : '—'}
+
+                  {/* Error message if failed */}
+                  {s && !s.is_healthy && (
+                    <div
+                      className="mono text-[8px] p-2 leading-relaxed"
+                      style={{ background: 'rgba(255,51,102,0.08)', border: '1px solid rgba(255,51,102,0.2)', color: '#ff8888' }}
+                    >
+                      <div className="text-red mb-1">LAST ERROR:</div>
+                      {/* error_message comes via sync log — show truncated */}
+                      Check docker logs for details. Common causes: portal maintenance window,
+                      changed HTML structure, network timeout.
                     </div>
+                  )}
+
+                  {/* Trigger button */}
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => trigger.mutate(col.trigger_key!)}
+                      disabled={trigger.isPending}
+                      className="mono text-[8px] px-3 py-1.5 border tracking-widest transition-all hover:border-green-600/50 hover:text-green hover:bg-green-900/20 text-dim disabled:opacity-40"
+                      style={{ borderColor: '#1a2a3a' }}
+                    >
+                      {trigger.isPending && trigger.variables === col.trigger_key
+                        ? '⟳ RUNNING...'
+                        : '▶ TRIGGER NOW'
+                      }
+                    </button>
+                    <a
+                      href={col.source_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="mono text-[8px] px-3 py-1.5 border tracking-widest text-dim hover:text-blue hover:border-blue-800/50 transition-all"
+                      style={{ borderColor: '#1a2a3a' }}
+                    >
+                      VERIFY ON SOURCE ↗
+                    </a>
                   </div>
                 </div>
+              )
+            })}
+          </div>
+        </div>
 
-                {col.trigger_key && (
-                  <button
-                    onClick={() => trigger.mutate(col.trigger_key!)}
-                    disabled={trigger.isPending}
-                    className="mono text-[8px] px-3 py-1.5 border tracking-widest transition-colors hover:bg-green-900/20 hover:border-green-800/50 hover:text-green text-dim"
-                    style={{ borderColor: '#1a2a3a' }}
-                  >
-                    {trigger.isPending ? '⟳ RUNNING...' : '▶ TRIGGER NOW'}
-                  </button>
-                )}
+        {/* Phase 2 collectors — coming soon */}
+        <div>
+          <div className="mono text-[8px] text-dim tracking-widest mb-3 flex items-center gap-2">
+            PHASE 2 — NOT YET BUILT
+            <div style={{ flex: 1, height: 1, background: '#1a2a3a' }} />
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
+            {COLLECTORS.filter(c => c.phase === 2).map(col => (
+              <div key={col.name} className="panel opacity-50">
+                <div className="mono text-[9px] font-bold text-dim mb-1">{col.label}</div>
+                <a href={col.source_url} target="_blank" rel="noopener noreferrer"
+                  className="mono text-[7px] text-blue hover:underline block mb-2">{col.source} ↗</a>
+                <div className="mono text-[7px] text-dim">{col.schedule}</div>
               </div>
-            )
-          })}
+            ))}
+          </div>
         </div>
 
-        <div className="panel p-4 mono text-[9px] text-dim leading-relaxed">
-          <div className="text-white mb-1 tracking-widest text-[8px]">HOW AUTO-UPDATES WORK</div>
-          All data collectors run automatically via APScheduler inside the FastAPI backend.
-          MGNREGA and JJM data fetches at 6:00 AM IST daily from official government portals.
-          If the live portal is unavailable (common during maintenance windows),
-          the system uses the last known good data. You can also manually trigger any collector using the button above.
+        {/* How it works */}
+        <div className="panel p-4 space-y-2">
+          <div className="mono text-[8px] text-white tracking-widest">HOW DATA FLOWS</div>
+          <div className="mono text-[9px] text-dim leading-loose">
+            <span className="text-white">6:00 AM IST</span> → Scheduler fires both collectors simultaneously<br />
+            <span className="text-white">Collector</span> → HTTP GET to govt portal → parse HTML/JSON → validate (no zeros, no missing districts)<br />
+            <span className="text-white">On success</span> → write to <code className="text-blue">scheme_progress</code> table → gap_calculator updates all %s<br />
+            <span className="text-white">On failure</span> → write FAILED to <code className="text-blue">data_sync_log</code> → dashboard shows previous snapshot with its date<br />
+            <span className="text-white">You</span> → see "Updated 6 hours ago" on each data card, not silently stale data
+          </div>
         </div>
+
       </div>
     </div>
   )

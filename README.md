@@ -19,7 +19,7 @@ docker-compose up --build
 cd backend
 pip install -r requirements.txt
 playwright install chromium
-pytho3 -m uvicorn main:app --reload --port 8000
+uvicorn main:app --reload --port 8000
 ```
 
 **Frontend:**
