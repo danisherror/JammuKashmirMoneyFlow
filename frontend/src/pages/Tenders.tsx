@@ -1,14 +1,24 @@
+import { useState, useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { fetchTenders, fetchContractorLeaderboard } from '../lib/api'
+import { fetchTenders, fetchContractorLeaderboard, fetchDepartments } from '../lib/api'
 import { fmtLakhs } from '../lib/utils'
 import PageHeader from '../components/PageHeader'
 import ErrorBox from '../components/ErrorBox'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts'
+import { Search } from 'lucide-react'
 
 export default function Tenders() {
+  const [searchTerm, setSearchTerm] = useState('')
+  const [deptFilter, setDeptFilter] = useState('all')
+
   const { data: tenders, isLoading: loadingTenders, isError: errorTenders } = useQuery({
     queryKey: ['tenders'],
-    queryFn: () => fetchTenders(100),
+    queryFn: () => fetchTenders(200), // bump limit so client-side filter works better
+  })
+
+  const { data: departments } = useQuery({
+    queryKey: ['departments', '2024-25'], // just for the list of names
+    queryFn: () => fetchDepartments('2024-25'),
   })
 
   const { data: leaderboard, isLoading: loadingLeaderboard } = useQuery({
@@ -16,11 +26,46 @@ export default function Tenders() {
     queryFn: () => fetchContractorLeaderboard(15),
   })
 
+  const filteredTenders = useMemo(() => {
+    if (!tenders) return []
+    return tenders.filter(t => {
+      const matchSearch = t.title.toLowerCase().includes(searchTerm.toLowerCase()) || 
+                          t.contractor_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                          t.tender_ref.toLowerCase().includes(searchTerm.toLowerCase())
+      const matchDept = deptFilter === 'all' || t.department_name.includes(deptFilter)
+      return matchSearch && matchDept
+    })
+  }, [tenders, searchTerm, deptFilter])
+
   return (
     <div className="flex flex-col h-full">
       <PageHeader
         title="TENDERS & CONTRACTS"
         subtitle="PUBLIC WORKS AND CONTRACTOR LEADERBOARD"
+        right={
+          <div className="flex items-center gap-4">
+            <div className="relative">
+              <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-dim" />
+              <input
+                type="text"
+                placeholder="Search title, contractor..."
+                value={searchTerm}
+                onChange={e => setSearchTerm(e.target.value)}
+                className="bg-[#0a1018] border border-[#1a2a3a] text-white mono text-[10px] pl-9 pr-3 py-1.5 focus:outline-none focus:border-blue-500/50 w-64"
+              />
+            </div>
+            <select
+              value={deptFilter}
+              onChange={e => setDeptFilter(e.target.value)}
+              className="bg-[#0a1018] border border-[#1a2a3a] text-white mono text-[10px] px-3 py-1.5 focus:outline-none focus:border-blue-500/50 max-w-[200px]"
+            >
+              <option value="all">ALL DEPARTMENTS</option>
+              {departments?.map(d => (
+                <option key={d.id} value={d.name}>{d.name}</option>
+              ))}
+            </select>
+          </div>
+        }
       />
 
       <div className="p-6 space-y-6 flex-1 overflow-auto">
@@ -101,7 +146,7 @@ export default function Tenders() {
                       <td colSpan={6} className="p-8 text-center text-dim animate-pulse">Loading Tenders...</td>
                     </tr>
                   ) : (
-                    (tenders || []).map((t, i) => {
+                    filteredTenders.map((t, i) => {
                       const est = t.estimated_cost_lakhs
                       const awd = t.awarded_cost_lakhs
                       const diff = (est && awd) ? awd - est : 0
@@ -123,7 +168,7 @@ export default function Tenders() {
                             <div className="text-gold">{awd ? fmtLakhs(awd) : '-'}</div>
                             {awd && est && (
                               <div className={`text-[8px] mt-1 ${isOverrun ? 'text-red' : 'text-green'}`}>
-                                {isOverrun ? '+' : ''}{fmtLakhs(diff)}
+                                {isOverrun ? '+' : '-'}{fmtLakhs(Math.abs(diff))} {isOverrun ? 'overrun' : 'saved'}
                               </div>
                             )}
                           </td>

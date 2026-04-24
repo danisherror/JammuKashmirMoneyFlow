@@ -84,7 +84,7 @@ export default function Overview() {
               sub={`${fmtPct(overview.capital_pct)} of total`} />
             <KpiCard label="Revenue Expenditure" value={overview.total_revenue_lakhs} format="lakhs" direction="neutral"
               sub={`${fmtPct(overview.revenue_pct)} of total`} />
-            <KpiCard label="Departments" value={overview.total_departments} direction="neutral"
+            <KpiCard label="Funded Departments" value={overview.total_departments} direction="neutral"
               sub={`FY ${financialYear}`} />
           </div>
         )}
@@ -221,6 +221,13 @@ export default function Overview() {
                 </tbody>
               </table>
             </div>
+            {gaps.length > 10 && (
+              <div className="mt-3 flex justify-end">
+                <a href="/departments" className="mono text-[9px] text-blue hover:opacity-80 transition-opacity">
+                  View all {gaps.length} departments →
+                </a>
+              </div>
+            )}
           </div>
         )}
 

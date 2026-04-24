@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useAppStore } from '../store'
 import { fetchDBTSchemes, fetchDBTGap, DBTSchemeSummary } from '../lib/api'
@@ -23,10 +23,12 @@ export default function DBT() {
     enabled: !!selectedScheme,
   })
 
-  // Auto-select first scheme when data loads
-  if (schemes && schemes.length > 0 && !selectedScheme) {
-    setSelectedScheme(schemes[0])
-  }
+  // Auto-select first scheme when data loads (fix: was in render body causing React violation)
+  useEffect(() => {
+    if (schemes && schemes.length > 0 && !selectedScheme) {
+      setSelectedScheme(schemes[0])
+    }
+  }, [schemes])
 
   return (
     <div className="flex flex-col h-full">

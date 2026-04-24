@@ -113,7 +113,9 @@ export default function DepartmentDetail() {
             {monthlyData.length === 0 && (
               <div className="panel p-6 text-center">
                 <div className="mono text-[10px] text-dim">
-                  Monthly expenditure data will appear once CGA monthly accounts are scraped (Phase 2).
+                  Monthly expenditure data populates after CGA runs (monthly, 26th of each month).
+                  Trigger it manually from the{' '}
+                  <a href="/sync" className="text-blue hover:underline">Sync Status page</a>.
                 </div>
               </div>
             )}

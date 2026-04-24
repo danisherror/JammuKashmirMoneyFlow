@@ -31,29 +31,33 @@ async def get_district_heatmap(
 ):
     """
     Returns all 20 districts with aggregated fund absorption scores.
-    Optimized for map rendering — minimal payload.
+    Fixed: was N+1 queries (1 per district); now 2 queries total.
     """
     districts = (await db.execute(select(District))).scalars().all()
+
+    # ── Single aggregation query for all districts ────────────────────────────
+    agg_query = select(
+        SchemeProgress.district_id,
+        func.avg(SchemeProgress.utilization_pct).label("avg_util"),
+        func.sum(SchemeProgress.funds_allocated).label("total_alloc"),
+        func.sum(SchemeProgress.funds_utilized).label("total_util"),
+        func.count(SchemeProgress.scheme_id.distinct()).label("scheme_count"),
+    ).where(
+        SchemeProgress.financial_year == financial_year,
+    ).group_by(SchemeProgress.district_id)
+
+    if scheme_code:
+        from database.models import Scheme
+        scheme_sq = select(Scheme.id).where(Scheme.code == scheme_code).scalar_subquery()
+        agg_query = agg_query.where(SchemeProgress.scheme_id == scheme_sq)
+
+    agg_rows = (await db.execute(agg_query)).all()
+    agg_map = {row.district_id: row for row in agg_rows}
+
     results = []
-
     for district in districts:
-        query = select(
-            func.avg(SchemeProgress.utilization_pct).label("avg_util"),
-            func.sum(SchemeProgress.funds_allocated).label("total_alloc"),
-            func.sum(SchemeProgress.funds_utilized).label("total_util"),
-            func.count(SchemeProgress.scheme_id.distinct()).label("scheme_count"),
-        ).where(
-            SchemeProgress.district_id == district.id,
-            SchemeProgress.financial_year == financial_year,
-        )
-
-        if scheme_code:
-            from database.models import Scheme
-            scheme_sq = select(Scheme.id).where(Scheme.code == scheme_code).scalar_subquery()
-            query = query.where(SchemeProgress.scheme_id == scheme_sq)
-
-        agg = (await db.execute(query)).one()
-        avg_util = round(agg.avg_util or 0, 2)
+        agg = agg_map.get(district.id)
+        avg_util = round(agg.avg_util or 0, 2) if agg else 0.0
 
         results.append(DistrictHeatmapItem(
             id=district.id,
@@ -63,9 +67,9 @@ async def get_district_heatmap(
             population=district.population,
             is_border_district=district.is_border_district,
             avg_utilization_pct=avg_util,
-            total_funds_allocated_lakhs=agg.total_alloc or 0,
-            total_funds_utilized_lakhs=agg.total_util or 0,
-            active_schemes_count=agg.scheme_count or 0,
+            total_funds_allocated_lakhs=int(agg.total_alloc or 0) if agg else 0,
+            total_funds_utilized_lakhs=int(agg.total_util or 0) if agg else 0,
+            active_schemes_count=int(agg.scheme_count or 0) if agg else 0,
             absorption_score=avg_util,
             absorption_grade=_absorption_grade(avg_util),
         ))
@@ -127,6 +131,8 @@ async def get_district_detail(
                 utilization_pct=progress.utilization_pct,
                 release_pct=progress.release_pct,
                 snapshot_date=progress.snapshot_date,
+                scheme_name=scheme.name,
+                scheme_code=scheme.code,
             ))
 
     total_allocated = sum(s.funds_allocated_lakhs or 0 for s in scheme_progress_list)

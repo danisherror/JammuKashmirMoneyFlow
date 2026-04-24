@@ -83,6 +83,7 @@ class SchemeSummary(BaseModel):
     department_name: str
     total_outlay_lakhs: Optional[int]
     funds_allocated_lakhs: Optional[int]
+    funds_released_lakhs: Optional[int]          # PFMS central release aggregate
     funds_utilized_lakhs: Optional[int]
     utilization_pct: Optional[float]
     physical_pct: Optional[float]
@@ -107,6 +108,8 @@ class SchemeDistrictProgress(BaseModel):
     utilization_pct: Optional[float]
     release_pct: Optional[float]
     snapshot_date: Optional[date]
+    scheme_name: Optional[str] = None           # populated in district detail view
+    scheme_code: Optional[str] = None
 
     class Config:
         from_attributes = True
@@ -191,6 +194,7 @@ class SyncStatusItem(BaseModel):
     records_last_run: int
     next_run: Optional[str]
     is_healthy: bool
+    error_message: Optional[str] = None
 
     class Config:
         from_attributes = True

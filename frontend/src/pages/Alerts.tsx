@@ -207,6 +207,7 @@ export default function Alerts() {
           <div className="mono text-[10px] text-dim tracking-widest mb-3 flex items-center gap-2">
             <span className="w-2 h-2 rounded-full bg-red animate-pulse inline-block" />
             CAG AUDIT FEED — AI-SUMMARIZED IRREGULARITIES
+            <span className="mono text-[8px] text-dim ml-2 font-normal border border-[#1a2a3a] px-1.5 py-0.5 bg-white/5">ALL YEARS</span>
           </div>
           <div className="flex-1 overflow-auto custom-scrollbar">
             {loadingCAG && <div className="mono text-[9px] text-dim animate-pulse">Loading audit findings...</div>}

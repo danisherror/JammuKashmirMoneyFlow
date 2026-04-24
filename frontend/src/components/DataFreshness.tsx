@@ -3,6 +3,17 @@ import { formatDistanceToNow, parseISO } from 'date-fns'
 import { fetchSyncStatus } from '../lib/api'
 import { Link } from 'react-router-dom'
 
+const COLLECTOR_LABELS: Record<string, string> = {
+  'mgnrega_collector': 'MGNREGA',
+  'jjm_collector': 'JJM',
+  'pmay_collector': 'PMAY-G',
+  'dbt_collector': 'DBT',
+  'pfms_collector': 'PFMS',
+  'tenders_collector': 'TENDERS',
+  'cga_collector': 'CGA (EXP)',
+  'cag_collector': 'CAG AUDITS',
+}
+
 /**
  * Shows a strip of data freshness badges — one per active collector.
  * If data is stale or never fetched, it shows clearly so users
@@ -42,7 +53,7 @@ export default function DataFreshness() {
           <div key={s.collector_name} className="flex items-center gap-1.5 flex-shrink-0">
             <div className="w-1.5 h-1.5 rounded-full" style={{ background: dotColor }} />
             <span className="mono text-[8px]" style={{ color: dotColor }}>
-              {s.collector_name.replace('_collector', '').toUpperCase()}
+              {COLLECTOR_LABELS[s.collector_name] ?? s.collector_name.replace('_collector', '').toUpperCase()}
             </span>
             <span className="mono text-[8px] text-dim">{timeLabel}</span>
           </div>

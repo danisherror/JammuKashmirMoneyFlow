@@ -56,6 +56,26 @@ const EXPORTS: ExportDef[] = [
     icon: <FileText size={18} />,
     accent: '#ff6432',
   },
+  {
+    id: 'gap-analysis',
+    label: 'FUND GAP ANALYSIS (CSV)',
+    description: 'Department-level gap between allocated budget, central releases (PFMS), and actual utilization.',
+    endpoint: '/export/gap-analysis',
+    filename: (fy) => `jk_gap_analysis_${fy.replace('-','_')}.csv`,
+    type: 'csv',
+    icon: <Database size={18} />,
+    accent: '#ff3366',
+  },
+  {
+    id: 'cag',
+    label: 'CAG FINDINGS (CSV)',
+    description: 'All parsed CAG audit report findings, summaries, and flagged financial amounts.',
+    endpoint: '/export/cag-findings',
+    filename: () => 'jk_cag_findings.csv',
+    type: 'csv',
+    icon: <FileText size={18} />,
+    accent: '#b366ff',
+  },
 ]
 
 export default function Export() {
@@ -184,10 +204,12 @@ export default function Export() {
           </div>
           <div className="space-y-1">
             {[
-              ['GET', '/api/v1/export/zip',     'Full ZIP archive (all datasets)'],
-              ['GET', '/api/v1/export/schemes',  'Scheme progress CSV'],
-              ['GET', '/api/v1/export/tenders',  'Tenders CSV'],
-              ['GET', '/api/v1/export/dbt',      'DBT transfers CSV'],
+              ['GET', '/api/v1/export/zip',          'Full ZIP archive (all datasets)'],
+              ['GET', '/api/v1/export/gap-analysis', 'Department gap analysis CSV'],
+              ['GET', '/api/v1/export/cag-findings', 'CAG audit findings CSV'],
+              ['GET', '/api/v1/export/schemes',      'Scheme progress CSV'],
+              ['GET', '/api/v1/export/tenders',      'Tenders CSV'],
+              ['GET', '/api/v1/export/dbt',          'DBT transfers CSV'],
             ].map(([method, path, desc]) => (
               <div key={path} className="flex items-center gap-3">
                 <span className="mono text-[7px] px-1.5 py-0.5 text-green" style={{ background: 'rgba(0,255,136,0.1)', border: '1px solid rgba(0,255,136,0.2)' }}>

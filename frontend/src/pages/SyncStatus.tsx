@@ -6,78 +6,87 @@ import PageHeader from '../components/PageHeader'
 import ErrorBox from '../components/ErrorBox'
 
 interface CollectorDef {
-  name:        string
-  label:       string
+  name: string
+  label: string
   trigger_key: string | null
-  source:      string
-  source_url:  string
-  schedule:    string
-  phase:       number
+  source: string
+  source_url: string
+  schedule: string
+  phase: number
 }
 
 const COLLECTORS: CollectorDef[] = [
   {
-    name:        'mgnrega_collector',
-    label:       'MGNREGA',
+    name: 'mgnrega_collector',
+    label: 'MGNREGA',
     trigger_key: 'mgnrega',
-    source:      'nreganarayan.nic.in',
-    source_url:  'https://nreganarayan.nic.in/netnrega/home.aspx',
-    schedule:    'Weekly (Sunday 6:00 AM)',
-    phase:       1,
+    source: 'nreganarayan.nic.in',
+    source_url: 'https://nreganarayan.nic.in/netnrega/home.aspx',
+    schedule: 'Weekly (Sunday 6:00 AM)',
+    phase: 1,
   },
   {
-    name:        'jjm_collector',
-    label:       'JAL JEEVAN MISSION',
+    name: 'jjm_collector',
+    label: 'JAL JEEVAN MISSION',
     trigger_key: 'jjm',
-    source:      'ejalshakti.gov.in',
-    source_url:  'https://ejalshakti.gov.in/jjmreport/JJMIndia.aspx',
-    schedule:    'Weekly (Sunday 6:00 AM)',
-    phase:       1,
+    source: 'ejalshakti.gov.in',
+    source_url: 'https://ejalshakti.gov.in/jjmreport/JJMIndia.aspx',
+    schedule: 'Weekly (Sunday 6:00 AM)',
+    phase: 1,
   },
   {
-    name:        'pmay_collector',
-    label:       'PM AWAS YOJANA',
+    name: 'pmay_collector',
+    label: 'PM AWAS YOJANA',
     trigger_key: 'pmay',
-    source:      'pmayg.nic.in',
-    source_url:  'https://pmayg.nic.in',
-    schedule:    'Weekly (Sunday 6:00 AM)',
-    phase:       1,
+    source: 'pmayg.nic.in',
+    source_url: 'https://pmayg.nic.in',
+    schedule: 'Weekly (Sunday 6:00 AM)',
+    phase: 1,
   },
   {
-    name:        'dbt_collector',
-    label:       'DBT TRANSFERS',
+    name: 'dbt_collector',
+    label: 'DBT TRANSFERS',
     trigger_key: 'dbt',
-    source:      'dbtbharat.gov.in',
-    source_url:  'https://dbtbharat.gov.in',
-    schedule:    'Weekly (Sunday 6:00 AM)',
-    phase:       1,
+    source: 'dbtbharat.gov.in',
+    source_url: 'https://dbtbharat.gov.in',
+    schedule: 'Weekly (Sunday 6:00 AM)',
+    phase: 1,
   },
   {
-    name:        'tender_collector',
-    label:       'TENDERS',
+    name: 'tender_collector',
+    label: 'TENDERS',
     trigger_key: 'tenders',
-    source:      'jktenders.gov.in',
-    source_url:  'https://jktenders.gov.in',
-    schedule:    'Weekly (Sunday 6:00 AM)',
-    phase:       1,
+    source: 'jktenders.gov.in',
+    source_url: 'https://jktenders.gov.in',
+    schedule: 'Weekly (Sunday 6:00 AM)',
+    phase: 1,
   },
   {
-    name:        'cga_collector',
-    label:       'BUDGET EXPENDITURE (CGA)',
+    name: 'cga_collector',
+    label: 'BUDGET EXPENDITURE (CGA)',
     trigger_key: 'cga',
-    source:      'cga.nic.in',
-    source_url:  'https://cga.nic.in',
-    schedule:    'Monthly (26th 8:00 AM)',
-    phase:       2,
+    source: 'cga.nic.in',
+    source_url: 'https://cga.nic.in',
+    schedule: 'Monthly (26th 8:00 AM)',
+    phase: 1,
   },
   {
-    name:        'cag_collector',
-    label:       'CAG AUDIT REPORTS',
+    name: 'cag_collector',
+    label: 'CAG AUDIT REPORTS',
     trigger_key: 'cag',
-    source:      'cag.gov.in',
-    source_url:  'https://cag.gov.in/en/audit-report?tags=Jammu+%26+Kashmir',
-    schedule:    'Monthly (Phase 3)',
-    phase:       3,
+    source: 'cag.gov.in',
+    source_url: 'https://cag.gov.in/en/audit-report?tags=Jammu+%26+Kashmir',
+    schedule: 'Monthly (Phase 3)',
+    phase: 1,
+  },
+  {
+    name: 'pfms_collector',
+    label: 'PFMS CENTRAL RELEASES',
+    trigger_key: 'pfms',
+    source: 'pfms.nic.in',
+    source_url: 'https://pfms.nic.in/NewDefaultHome.aspx',
+    schedule: 'Daily (6:00 AM IST)',
+    phase: 1,
   },
 ]
 
@@ -90,7 +99,7 @@ function timeAgo(iso: string | null): string {
 export default function SyncStatus() {
   const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ['sync-status'],
-    queryFn:  fetchSyncStatus,
+    queryFn: fetchSyncStatus,
     refetchInterval: 30_000,
   })
 
@@ -146,9 +155,9 @@ export default function SyncStatus() {
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {COLLECTORS.filter(c => c.phase === 1).map(col => {
-              const s        = byName[col.name]
-              const healthy  = s?.is_healthy ?? false
-              const status   = s?.status ?? 'NEVER RUN'
+              const s = byName[col.name]
+              const healthy = s?.is_healthy ?? false
+              const status = s?.status ?? 'NEVER RUN'
               const dotColor = healthy ? '#00ff88' : s ? '#ff3366' : '#5a7a9a'
               const borderColor = healthy
                 ? 'rgba(0,255,136,0.25)'
@@ -185,10 +194,10 @@ export default function SyncStatus() {
                   {/* Stats grid */}
                   <div className="grid grid-cols-2 gap-x-6 gap-y-2">
                     {[
-                      { label: 'SCHEDULE',       val: col.schedule },
-                      { label: 'LAST RUN',        val: timeAgo(s?.last_run ?? null) },
-                      { label: 'LAST SUCCESS',    val: timeAgo(s?.last_success ?? null) },
-                      { label: 'RECORDS (LAST)',  val: s ? String(s.records_last_run) : '—' },
+                      { label: 'SCHEDULE', val: col.schedule },
+                      { label: 'LAST RUN', val: timeAgo(s?.last_run ?? null) },
+                      { label: 'LAST SUCCESS', val: timeAgo(s?.last_success ?? null) },
+                      { label: 'RECORDS (LAST)', val: s ? String(s.records_last_run) : '—' },
                     ].map(({ label, val }) => (
                       <div key={label}>
                         <div className="mono text-[7px] text-dim tracking-widest mb-0.5">{label}</div>
@@ -204,9 +213,10 @@ export default function SyncStatus() {
                       style={{ background: 'rgba(255,51,102,0.08)', border: '1px solid rgba(255,51,102,0.2)', color: '#ff8888' }}
                     >
                       <div className="text-red mb-1">LAST ERROR:</div>
-                      {/* error_message comes via sync log — show truncated */}
-                      Check docker logs for details. Common causes: portal maintenance window,
-                      changed HTML structure, network timeout.
+                      {s.error_message ? s.error_message : (
+                        'Check docker logs for details. Common causes: portal maintenance window, ' +
+                        'changed HTML structure, network timeout.'
+                      )}
                     </div>
                   )}
 
@@ -239,24 +249,7 @@ export default function SyncStatus() {
           </div>
         </div>
 
-        {/* Phase 2 collectors — coming soon */}
-        <div>
-          <div className="mono text-[8px] text-dim tracking-widest mb-3 flex items-center gap-2">
-            PHASE 2 — NOT YET BUILT
-            <div style={{ flex: 1, height: 1, background: '#1a2a3a' }} />
-          </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
-            {COLLECTORS.filter(c => c.phase === 2).map(col => (
-              <div key={col.name} className="panel opacity-50">
-                <div className="mono text-[9px] font-bold text-dim mb-1">{col.label}</div>
-                <a href={col.source_url} target="_blank" rel="noopener noreferrer"
-                  className="mono text-[7px] text-blue hover:underline block mb-2">{col.source} ↗</a>
-                <div className="mono text-[7px] text-dim">{col.schedule}</div>
-              </div>
-            ))}
-          </div>
-        </div>
 
         {/* How it works */}
         <div className="panel p-4 space-y-2">

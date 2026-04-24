@@ -4,6 +4,7 @@ import {
 } from 'recharts'
 import { format, parseISO } from 'date-fns'
 import type { SchemeVelocity } from '../lib/api'
+import { fmtLakhs } from '../lib/utils'
 
 interface VelocityChartProps {
   velocity: SchemeVelocity
@@ -14,12 +15,6 @@ const VERDICT_CONFIG = {
   'AT RISK':   { color: '#ffd700', bg: 'rgba(255,215,0,0.1)',  border: 'rgba(255,215,0,0.3)',  icon: '⚠' },
   'CRITICAL':  { color: '#ff3366', bg: 'rgba(255,51,102,0.1)', border: 'rgba(255,51,102,0.3)', icon: '✕' },
   'NO DATA':   { color: '#5a7a9a', bg: 'rgba(90,122,154,0.1)', border: 'rgba(90,122,154,0.3)', icon: '—' },
-}
-
-function fmtLakhs(n: number | null | undefined) {
-  if (n == null) return '—'
-  if (n >= 100) return `₹${(n / 100).toFixed(1)} Cr`
-  return `₹${n.toLocaleString('en-IN')} L`
 }
 
 export default function VelocityChart({ velocity }: VelocityChartProps) {

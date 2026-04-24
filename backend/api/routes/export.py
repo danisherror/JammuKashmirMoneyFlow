@@ -229,3 +229,85 @@ License: Open Data — Attribution required.
         media_type="application/zip",
         headers={"Content-Disposition": f"attachment; filename={filename}"},
     )
+
+
+@router.get("/gap-analysis", summary="Export gap analysis as CSV")
+async def export_gap_analysis(
+    financial_year: str = Query("2024-25"),
+    db: AsyncSession = Depends(get_db),
+):
+    """Download department-level fund gap analysis as CSV."""
+    from sqlalchemy import and_, func as sqlfunc
+    from database.models import Department, BudgetAllocation, Expenditure, Scheme, SchemeProgress
+
+    rows = (await db.execute(
+        select(Department, BudgetAllocation)
+        .join(BudgetAllocation, and_(
+            BudgetAllocation.department_id == Department.id,
+            BudgetAllocation.financial_year == financial_year,
+        ))
+        .where(Department.is_active == True)
+    )).all()
+
+    exp_rows = (await db.execute(
+        select(Expenditure.department_id, sqlfunc.sum(Expenditure.utilized_amount).label("total"))
+        .where(Expenditure.financial_year == financial_year)
+        .group_by(Expenditure.department_id)
+    )).all()
+    exp_map = {r.department_id: (r.total or 0) for r in exp_rows}
+
+    pfms_rows = (await db.execute(
+        select(Scheme.department_id, sqlfunc.sum(SchemeProgress.funds_released).label("total"))
+        .join(SchemeProgress, SchemeProgress.scheme_id == Scheme.id)
+        .where(SchemeProgress.financial_year == financial_year)
+        .group_by(Scheme.department_id)
+    )).all()
+    pfms_map = {r.department_id: (r.total or 0) for r in pfms_rows}
+
+    output_rows = []
+    for dept, alloc in rows:
+        utilized = exp_map.get(dept.id, 0)
+        budget = alloc.budget_estimate or 0
+        released = pfms_map.get(dept.id, 0)
+        effective_release = max(released, budget) if released == 0 else released
+        gap = effective_release - utilized
+        util_pct = round((utilized / budget * 100), 2) if budget > 0 else 0
+        output_rows.append({
+            "department": dept.name,
+            "department_code": dept.code,
+            "division": dept.division,
+            "financial_year": financial_year,
+            "allocated_lakhs": budget,
+            "released_lakhs": effective_release,
+            "utilized_lakhs": utilized,
+            "gap_lakhs": gap,
+            "utilization_pct": util_pct,
+        })
+    output_rows.sort(key=lambda x: x["gap_lakhs"], reverse=True)
+    return csv_response(output_rows, f"jk_gap_analysis_{financial_year.replace('-','_')}.csv")
+
+
+@router.get("/cag-findings", summary="Export CAG audit findings as CSV")
+async def export_cag_findings(db: AsyncSession = Depends(get_db)):
+    """Download all CAG audit findings as CSV."""
+    from database.models import CAGFinding
+    from sqlalchemy import desc
+
+    rows = (await db.execute(
+        select(CAGFinding).order_by(desc(CAGFinding.report_year), desc(CAGFinding.id))
+    )).scalars().all()
+
+    output_rows = [
+        {
+            "report_year": r.report_year,
+            "report_title": r.report_title,
+            "department": r.department_name_raw,
+            "finding_summary": r.finding_summary,
+            "amount_flagged_lakhs": r.amount_flagged,
+            "severity": r.severity,
+            "paragraph_ref": r.paragraph_ref,
+            "source_pdf_url": r.source_pdf_url,
+        }
+        for r in rows
+    ]
+    return csv_response(output_rows, "jk_cag_findings.csv")

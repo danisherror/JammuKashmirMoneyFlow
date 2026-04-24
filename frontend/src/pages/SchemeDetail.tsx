@@ -105,6 +105,7 @@ export default function SchemeDetail() {
               <div className="panel-title">OVERALL UTILIZATION — ALL DISTRICTS</div>
               <UtilBar
                 allocated={data.funds_allocated_lakhs ?? 1}
+                released={data.funds_released_lakhs}
                 utilized={data.funds_utilized_lakhs}
               />
             </div>
@@ -156,7 +157,7 @@ export default function SchemeDetail() {
                   <table className="w-full">
                     <thead>
                       <tr className="border-b" style={{ borderColor: '#1a2a3a' }}>
-                        {['DISTRICT', 'DIV', 'TARGET', 'ACHIEVED', 'PHYS%', 'ALLOCATED', 'UTILIZED', 'UTIL%'].map(h => (
+                        {['DISTRICT', 'DIV', 'TARGET', 'ACHIEVED', 'PHYS%', 'ALLOCATED', 'RELEASED', 'UTILIZED', 'UTIL%'].map(h => (
                           <th key={h} className="mono text-[8px] text-dim text-left pb-2 pr-4 tracking-widest">{h}</th>
                         ))}
                       </tr>
@@ -173,6 +174,9 @@ export default function SchemeDetail() {
                             <span className={`mono text-[9px] ${utilColor(d.physical_pct)}`}>{fmtPct(d.physical_pct)}</span>
                           </td>
                           <td className="pr-4 mono text-[9px] text-blue">{fmtLakhs(d.funds_allocated_lakhs)}</td>
+                          <td className="pr-4 mono text-[9px] text-purple" title="Central funds released via PFMS">
+                            {d.funds_released_lakhs != null ? fmtLakhs(d.funds_released_lakhs) : <span className="text-dim">—</span>}
+                          </td>
                           <td className="pr-4 mono text-[9px] text-green">{fmtLakhs(d.funds_utilized_lakhs)}</td>
                           <td>
                             <span className={`mono text-[9px] ${utilColor(d.utilization_pct)}`}>

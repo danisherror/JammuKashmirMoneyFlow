@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { persist } from 'zustand/middleware'
 
 interface AppState {
   financialYear: string
@@ -7,9 +8,18 @@ interface AppState {
   toggleSidebar: () => void
 }
 
-export const useAppStore = create<AppState>((set) => ({
-  financialYear: '2024-25',
-  setFinancialYear: (fy) => set({ financialYear: fy }),
-  sidebarOpen: true,
-  toggleSidebar: () => set((s) => ({ sidebarOpen: !s.sidebarOpen })),
-}))
+export const useAppStore = create<AppState>()(
+  persist(
+    (set) => ({
+      financialYear: '2024-25',
+      setFinancialYear: (fy) => set({ financialYear: fy }),
+      sidebarOpen: true,
+      toggleSidebar: () => set((s) => ({ sidebarOpen: !s.sidebarOpen })),
+    }),
+    {
+      name: 'jk-money-flow-store',
+      // Only persist the FY selection — sidebar state resets on each session
+      partialize: (state) => ({ financialYear: state.financialYear }),
+    }
+  )
+)

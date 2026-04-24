@@ -26,7 +26,6 @@ async def get_budget_overview(
     Top-level J&K budget summary for the given financial year.
     Returns total allocation, capital vs revenue split.
     """
-    # Sum all allocations for the year
     result = await db.execute(
         select(
             func.sum(BudgetAllocation.budget_estimate).label("total"),
@@ -62,6 +61,7 @@ async def list_departments(
 ):
     """
     All departments with their budget allocation and utilization for the year.
+    Fixed: was N+1 queries; now uses 2 batch queries total.
     """
     query = (
         select(Department, BudgetAllocation)
@@ -77,18 +77,20 @@ async def list_departments(
 
     rows = (await db.execute(query)).all()
 
+    # ── Batch fetch all expenditure sums in ONE query (fix N+1) ──────────────
+    exp_rows = (await db.execute(
+        select(
+            Expenditure.department_id,
+            func.sum(Expenditure.utilized_amount).label("total"),
+        )
+        .where(Expenditure.financial_year == financial_year)
+        .group_by(Expenditure.department_id)
+    )).all()
+    exp_map = {row.department_id: (row.total or 0) for row in exp_rows}
+
     results = []
     for dept, alloc in rows:
-        # Get latest total expenditure for this dept
-        exp_result = await db.execute(
-            select(func.sum(Expenditure.utilized_amount)).where(
-                and_(
-                    Expenditure.department_id == dept.id,
-                    Expenditure.financial_year == financial_year,
-                )
-            )
-        )
-        utilized = exp_result.scalar() or 0
+        utilized = exp_map.get(dept.id, 0)
         budget = alloc.budget_estimate or 0
         util_pct = round((utilized / budget * 100), 2) if budget > 0 else None
 
@@ -106,7 +108,6 @@ async def list_departments(
             data_as_of=None,
         ))
 
-    # Sort
     if sort_by == "utilization_pct":
         results.sort(key=lambda x: x.utilization_pct or 0, reverse=True)
     else:
@@ -137,7 +138,6 @@ async def get_department_detail(
     )
     alloc = alloc_result.scalar_one_or_none()
 
-    # Monthly expenditure breakdown
     monthly_result = await db.execute(
         select(Expenditure.month, func.sum(Expenditure.utilized_amount).label("amount"))
         .where(
@@ -177,8 +177,10 @@ async def get_gap_analysis(
     """
     Departments ranked by their unspent budget gap.
     Highlights where allocated money is NOT being spent.
+    Fixed: was N+1 queries; now uses 3 batch queries total.
     """
     from database.models import Scheme, SchemeProgress
+
     rows = (await db.execute(
         select(Department, BudgetAllocation)
         .join(BudgetAllocation, and_(
@@ -191,34 +193,40 @@ async def get_gap_analysis(
         )
     )).all()
 
+    dept_ids = [dept.id for dept, _ in rows]
+
+    # ── Batch: expenditure sums ───────────────────────────────────────────────
+    exp_rows = (await db.execute(
+        select(
+            Expenditure.department_id,
+            func.sum(Expenditure.utilized_amount).label("total"),
+        )
+        .where(
+            Expenditure.financial_year == financial_year,
+            Expenditure.department_id.in_(dept_ids),
+        )
+        .group_by(Expenditure.department_id)
+    )).all()
+    exp_map = {row.department_id: (row.total or 0) for row in exp_rows}
+
+    # ── Batch: PFMS central releases per department ───────────────────────────
+    pfms_rows = (await db.execute(
+        select(
+            Scheme.department_id,
+            func.sum(SchemeProgress.funds_released).label("total"),
+        )
+        .join(SchemeProgress, SchemeProgress.scheme_id == Scheme.id)
+        .where(SchemeProgress.financial_year == financial_year)
+        .group_by(Scheme.department_id)
+    )).all()
+    pfms_map = {row.department_id: (row.total or 0) for row in pfms_rows}
+
     results = []
     for dept, alloc in rows:
-        exp_result = await db.execute(
-            select(func.sum(Expenditure.utilized_amount)).where(
-                and_(
-                    Expenditure.department_id == dept.id,
-                    Expenditure.financial_year == financial_year,
-                )
-            )
-        )
-        utilized = exp_result.scalar() or 0
+        utilized = exp_map.get(dept.id, 0)
         budget = alloc.budget_estimate
-        
-        # Fetch PFMS Central Release from SchemeProgress
-        pfms_result = await db.execute(
-            select(func.sum(SchemeProgress.funds_released))
-            .join(Scheme, SchemeProgress.scheme_id == Scheme.id)
-            .where(
-                and_(
-                    Scheme.department_id == dept.id,
-                    SchemeProgress.financial_year == financial_year
-                )
-            )
-        )
-        released = pfms_result.scalar() or 0
-        
-        # We calculate the ultimate gap: Central Release vs Utilized
-        # However, for total gap tracking, if released is missing, default to budget
+        released = pfms_map.get(dept.id, 0)
+
         effective_release = max(released, budget) if released == 0 else released
         gap = effective_release - utilized
         util_pct = round((utilized / budget * 100), 2) if budget > 0 else 0

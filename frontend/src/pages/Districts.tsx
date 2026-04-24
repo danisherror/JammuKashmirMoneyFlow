@@ -69,6 +69,10 @@ export default function Districts() {
                   <span style={{ color: gColor }}>{fmtLakhs(d.total_funds_utilized_lakhs)}</span>
                 </div>
                 <div className="flex justify-between mono text-[8px]">
+                  <span className="text-dim">POPULATION</span>
+                  <span className="text-white">{d.population?.toLocaleString() ?? '—'}</span>
+                </div>
+                <div className="flex justify-between mono text-[8px]">
                   <span className="text-dim">SCHEMES</span>
                   <span className="text-white">{d.active_schemes_count}</span>
                 </div>

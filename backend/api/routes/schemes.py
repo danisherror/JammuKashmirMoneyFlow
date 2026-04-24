@@ -23,7 +23,7 @@ async def list_schemes(
     department_id: int | None = Query(None),
     db: AsyncSession = Depends(get_db),
 ):
-    """All schemes with their aggregate financial progress."""
+    """All schemes with their aggregate financial progress. Fixed: was N+1; now 2 queries total."""
     query = select(Scheme, Department).join(Department)
     if scheme_type:
         query = query.where(Scheme.scheme_type == scheme_type)
@@ -32,25 +32,28 @@ async def list_schemes(
     query = query.where(Scheme.is_active == True)
 
     rows = (await db.execute(query)).all()
+
+    # ── Single batch aggregation (fix N+1) ─────────────────────────────────
+    agg_rows = (await db.execute(
+        select(
+            SchemeProgress.scheme_id,
+            func.sum(SchemeProgress.funds_allocated).label("allocated"),
+            func.sum(SchemeProgress.funds_utilized).label("utilized"),
+            func.sum(SchemeProgress.funds_released).label("released"),
+            func.avg(SchemeProgress.physical_pct).label("avg_physical"),
+            func.max(SchemeProgress.snapshot_date).label("latest_date"),
+        ).where(
+            SchemeProgress.financial_year == financial_year,
+        ).group_by(SchemeProgress.scheme_id)
+    )).all()
+    agg_map = {row.scheme_id: row for row in agg_rows}
+
     results = []
-
     for scheme, dept in rows:
-        # Aggregate progress across all districts for latest snapshot
-        agg = await db.execute(
-            select(
-                func.sum(SchemeProgress.funds_allocated).label("allocated"),
-                func.sum(SchemeProgress.funds_utilized).label("utilized"),
-                func.avg(SchemeProgress.physical_pct).label("avg_physical"),
-                func.max(SchemeProgress.snapshot_date).label("latest_date"),
-            ).where(
-                SchemeProgress.scheme_id == scheme.id,
-                SchemeProgress.financial_year == financial_year,
-            )
-        )
-        row = agg.one()
-
-        allocated = row.allocated or 0
-        utilized = row.utilized or 0
+        row = agg_map.get(scheme.id)
+        allocated = int(row.allocated or 0) if row else 0
+        utilized = int(row.utilized or 0) if row else 0
+        released = int(row.released or 0) if row else 0
         util_pct = round((utilized / allocated * 100), 2) if allocated > 0 else None
 
         results.append(SchemeSummary(
@@ -61,10 +64,11 @@ async def list_schemes(
             department_name=dept.name,
             total_outlay_lakhs=scheme.total_outlay,
             funds_allocated_lakhs=allocated,
+            funds_released_lakhs=released if released > 0 else None,
             funds_utilized_lakhs=utilized,
             utilization_pct=util_pct,
-            physical_pct=round(row.avg_physical, 2) if row.avg_physical else None,
-            last_updated=row.latest_date,
+            physical_pct=round(row.avg_physical, 2) if row and row.avg_physical else None,
+            last_updated=row.latest_date if row else None,
         ))
 
     results.sort(key=lambda x: x.total_outlay_lakhs or 0, reverse=True)
@@ -132,6 +136,7 @@ async def get_scheme_detail(
 
     total_allocated = sum(d.funds_allocated_lakhs or 0 for d in district_progress)
     total_utilized = sum(d.funds_utilized_lakhs or 0 for d in district_progress)
+    total_released = sum(d.funds_released_lakhs or 0 for d in district_progress)
     avg_physical = (
         sum(d.physical_pct or 0 for d in district_progress) / len(district_progress)
         if district_progress else None
@@ -145,6 +150,7 @@ async def get_scheme_detail(
         department_name=dept.name,
         total_outlay_lakhs=scheme.total_outlay,
         funds_allocated_lakhs=total_allocated,
+        funds_released_lakhs=total_released if total_released > 0 else None,
         funds_utilized_lakhs=total_utilized,
         utilization_pct=round((total_utilized / total_allocated * 100), 2) if total_allocated else None,
         physical_pct=round(avg_physical, 2) if avg_physical else None,

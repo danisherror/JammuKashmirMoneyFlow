@@ -16,8 +16,11 @@ export default function UtilBar({ allocated, released, utilized, showLabels = tr
   return (
     <div className="w-full">
       {showLabels && (
-        <div className="flex justify-between mb-1">
+        <div className="flex justify-between mb-1 items-end">
           <span className="mono text-[8px] text-dim">ALLOCATED</span>
+          {released != null && (
+            <span className="mono text-[8px] text-purple">RELEASED</span>
+          )}
           <span className="mono text-[8px]" style={{ color: utilPct >= 75 ? '#00ff88' : utilPct >= 40 ? '#ffd700' : '#ff3366' }}>
             {fmtPct(utilPct)} UTILIZED
           </span>

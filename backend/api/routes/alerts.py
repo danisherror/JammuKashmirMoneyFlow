@@ -73,6 +73,7 @@ async def get_sync_status(db: AsyncSession = Depends(get_db)):
             records_last_run=(log.records_inserted or 0) + (log.records_updated or 0),
             next_run="06:00 IST daily",
             is_healthy=is_healthy,
+            error_message=log.error_message if not is_healthy else None,
         ))
 
     return results
@@ -156,13 +157,21 @@ async def trigger_collector(
             detail=f"Unknown collector '{collector_name}'. Valid: {list(COLLECTOR_MAP.keys())}"
         )
 
-    # Import and run in background so API returns immediately
     if collector_name == "mgnrega":
         from scheduler.jobs import run_mgnrega
         background_tasks.add_task(run_mgnrega)
     elif collector_name == "jjm":
         from scheduler.jobs import run_jjm
         background_tasks.add_task(run_jjm)
+    elif collector_name == "pmay":
+        from scheduler.jobs import run_pmay
+        background_tasks.add_task(run_pmay)
+    elif collector_name == "dbt":
+        from scheduler.jobs import run_dbt
+        background_tasks.add_task(run_dbt)
+    elif collector_name == "tenders":
+        from scheduler.jobs import run_tenders
+        background_tasks.add_task(run_tenders)
     elif collector_name == "cga":
         from scheduler.jobs import run_cga
         background_tasks.add_task(run_cga)

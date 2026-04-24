@@ -87,6 +87,8 @@ def run_all_daily():
     run_pmay()
     run_dbt()
     run_tenders()
+    run_cga()
+    run_cag_audit()
     run_pfms()
     logger.info("⏰ Scheduler: Daily collection run complete")
 

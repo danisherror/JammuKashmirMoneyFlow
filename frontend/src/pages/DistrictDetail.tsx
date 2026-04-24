@@ -39,12 +39,13 @@ export default function DistrictDetail() {
 
         {data && (
           <>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
               {[
                 { label: 'ABSORPTION GRADE', val: data.absorption_grade, color: gColor, isText: true },
                 { label: 'AVG UTILIZATION', val: fmtPct(data.avg_utilization_pct), color: gColor, isText: true },
                 { label: 'TOTAL ALLOCATED', val: fmtLakhs(data.total_funds_allocated_lakhs), color: '#00aaff', isText: true },
                 { label: 'TOTAL UTILIZED', val: fmtLakhs(data.total_funds_utilized_lakhs), color: gColor, isText: true },
+                { label: 'POPULATION', val: data.population?.toLocaleString() ?? '—', color: '#5a7a9a', isText: true },
               ].map(({ label, val, color, isText }) => (
                 <div key={label} className="panel">
                   <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 2, background: color }} />
@@ -77,7 +78,10 @@ export default function DistrictDetail() {
                   {data.scheme_progress.map((sp: any) => (
                     <div key={sp.district_id + sp.snapshot_date} className="border-b pb-4" style={{ borderColor: '#1a2a3a' }}>
                       <div className="flex justify-between items-start mb-2">
-                        <div className="mono text-[10px] text-white">{sp.physical_unit ? `${sp.physical_unit.toUpperCase()} TARGET` : 'PROGRESS'}</div>
+                        <div className="mono text-[10px] text-white">
+                          <span className="text-blue mr-2">{sp.scheme_name ?? 'SCHEME'}</span>
+                          {sp.physical_unit ? `${sp.physical_unit.toUpperCase()} TARGET` : 'PROGRESS'}
+                        </div>
                         <span className={`mono text-[9px] ${utilColor(sp.utilization_pct)}`}>
                           {fmtPct(sp.utilization_pct)} utilized
                         </span>

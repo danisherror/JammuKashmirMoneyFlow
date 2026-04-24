@@ -1,23 +1,41 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 import { useAppStore } from '../store'
-import { fetchSchemes } from '../lib/api'
+import { fetchSchemes, fetchDepartments } from '../lib/api'
 import { fmtLakhs, fmtPct, utilColor, schemeBadge, schemeTypeLabel } from '../lib/utils'
 import UtilBar from '../components/UtilBar'
 import PageHeader from '../components/PageHeader'
 import LoadingGrid from '../components/LoadingGrid'
 import ErrorBox from '../components/ErrorBox'
+import { Search } from 'lucide-react'
 
 export default function Schemes() {
   const { financialYear } = useAppStore()
   const navigate = useNavigate()
   const [typeFilter, setTypeFilter] = useState<string>('all')
+  const [searchTerm, setSearchTerm] = useState('')
+  const [deptFilter, setDeptFilter] = useState('all')
 
   const { data, isLoading, isError } = useQuery({
     queryKey: ['schemes', financialYear, typeFilter],
     queryFn: () => fetchSchemes(financialYear, typeFilter === 'all' ? undefined : typeFilter),
   })
+
+  const { data: departments } = useQuery({
+    queryKey: ['departments', financialYear], // just for the list of names
+    queryFn: () => fetchDepartments(financialYear),
+  })
+
+  const filteredSchemes = useMemo(() => {
+    if (!data) return []
+    return data.filter(s => {
+      const matchSearch = s.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
+                          s.code.toLowerCase().includes(searchTerm.toLowerCase())
+      const matchDept = deptFilter === 'all' || s.department_name.includes(deptFilter)
+      return matchSearch && matchDept
+    })
+  }, [data, searchTerm, deptFilter])
 
   return (
     <div>
@@ -25,22 +43,46 @@ export default function Schemes() {
         title="SCHEMES"
         subtitle={`FLAGSHIP SCHEME FUND TRACKER — FY ${financialYear}`}
         right={
-          <div className="flex items-center gap-2">
-            {[
-              { key: 'all', label: 'ALL' },
-              { key: 'css', label: 'CSS' },
-              { key: 'central', label: 'CENTRAL' },
-              { key: 'ut', label: 'UT' },
-            ].map(({ key, label }) => (
-              <button key={key} onClick={() => setTypeFilter(key)}
-                className={`mono text-[8px] px-3 py-1.5 tracking-widest border transition-colors ${
-                  typeFilter === key
-                    ? 'border-yellow-500/50 text-gold bg-yellow-900/20'
-                    : 'border-border text-dim hover:text-white hover:border-white/20'
-                }`}>
-                {label}
-              </button>
-            ))}
+          <div className="flex flex-col md:flex-row items-end md:items-center gap-4">
+            <div className="flex items-center gap-2">
+              {[
+                { key: 'all', label: 'ALL' },
+                { key: 'css', label: 'CSS' },
+                { key: 'central', label: 'CENTRAL' },
+                { key: 'ut', label: 'UT' },
+              ].map(({ key, label }) => (
+                <button key={key} onClick={() => setTypeFilter(key)}
+                  className={`mono text-[8px] px-3 py-1.5 tracking-widest border transition-colors ${
+                    typeFilter === key
+                      ? 'border-yellow-500/50 text-gold bg-yellow-900/20'
+                      : 'border-border text-dim hover:text-white hover:border-white/20'
+                  }`}>
+                  {label}
+                </button>
+              ))}
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="relative">
+                <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-dim" />
+                <input
+                  type="text"
+                  placeholder="Search scheme..."
+                  value={searchTerm}
+                  onChange={e => setSearchTerm(e.target.value)}
+                  className="bg-[#0a1018] border border-[#1a2a3a] text-white mono text-[10px] pl-9 pr-3 py-1.5 focus:outline-none focus:border-blue-500/50 w-48"
+                />
+              </div>
+              <select
+                value={deptFilter}
+                onChange={e => setDeptFilter(e.target.value)}
+                className="bg-[#0a1018] border border-[#1a2a3a] text-white mono text-[10px] px-3 py-1.5 focus:outline-none focus:border-blue-500/50 max-w-[150px]"
+              >
+                <option value="all">ALL DEPARTMENTS</option>
+                {departments?.map(d => (
+                  <option key={d.id} value={d.name}>{d.name}</option>
+                ))}
+              </select>
+            </div>
           </div>
         }
       />
@@ -49,7 +91,7 @@ export default function Schemes() {
         {isLoading ? <LoadingGrid count={6} /> :
          isError   ? <ErrorBox /> : (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            {(data ?? []).map(scheme => {
+            {filteredSchemes.map(scheme => {
               const util = scheme.utilization_pct
               const phys = scheme.physical_pct
               return (
@@ -75,10 +117,11 @@ export default function Schemes() {
                   </div>
 
                   {/* Financial row */}
-                  <div className="grid grid-cols-3 gap-2 mb-3">
+                  <div className="grid grid-cols-4 gap-2 mb-3">
                     {[
                       { label: 'OUTLAY', val: scheme.total_outlay_lakhs, color: '#5a7a9a' },
                       { label: 'ALLOCATED', val: scheme.funds_allocated_lakhs, color: '#00aaff' },
+                      { label: 'RELEASED', val: scheme.funds_released_lakhs, color: '#b366ff' },
                       { label: 'UTILIZED', val: scheme.funds_utilized_lakhs, color: util != null && util >= 60 ? '#00ff88' : util != null && util >= 30 ? '#ffd700' : '#ff3366' },
                     ].map(({ label, val, color }) => (
                       <div key={label}>
@@ -91,6 +134,7 @@ export default function Schemes() {
                   {/* Financial progress bar */}
                   <UtilBar
                     allocated={scheme.funds_allocated_lakhs ?? 1}
+                    released={scheme.funds_released_lakhs}
                     utilized={scheme.funds_utilized_lakhs}
                     showLabels={false}
                   />
