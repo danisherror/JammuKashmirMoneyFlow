@@ -24,6 +24,7 @@ COLLECTOR_MAP = {
     "tenders": "scheduler.jobs.run_tenders",
     "cga": "scheduler.jobs.run_cga",
     "cag": "scheduler.jobs.run_cag_audit",
+    "pfms": "scheduler.jobs.run_pfms",
 }
 
 
@@ -168,6 +169,9 @@ async def trigger_collector(
     elif collector_name == "cag":
         from scheduler.jobs import run_cag_audit
         background_tasks.add_task(run_cag_audit)
+    elif collector_name == "pfms":
+        from scheduler.jobs import run_pfms
+        background_tasks.add_task(run_pfms)
 
     return {
         "message": f"Collector '{collector_name}' triggered in background",

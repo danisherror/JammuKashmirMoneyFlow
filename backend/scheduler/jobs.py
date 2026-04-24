@@ -17,6 +17,7 @@ from collectors.dbt_collector import DBTCollector
 from collectors.tenders_collector import TendersCollector
 from collectors.cga_collector import CGACollector
 from collectors.cag_collector import CAGCollector
+from collectors.pfms_collector import PFMSCollector
 from processors.gap_calculator import recalculate_all_gaps
 
 settings = get_settings()
@@ -71,6 +72,10 @@ def run_cag_audit():
     logger.info("⏰ Scheduler: CAG Audit collection starting")
     _run_collector(CAGCollector)
 
+def run_pfms():
+    logger.info("⏰ Scheduler: PFMS collection starting")
+    _run_collector(PFMSCollector)
+
 def run_all_daily():
     """
     Master daily job — runs all collectors.
@@ -82,6 +87,7 @@ def run_all_daily():
     run_pmay()
     run_dbt()
     run_tenders()
+    run_pfms()
     logger.info("⏰ Scheduler: Daily collection run complete")
 
 

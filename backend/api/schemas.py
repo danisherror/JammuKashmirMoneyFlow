@@ -66,6 +66,7 @@ class GapAnalysisItem(BaseModel):
     department_name: str
     department_code: str
     allocated_lakhs: int
+    released_lakhs: int
     utilized_lakhs: int
     gap_lakhs: int
     utilization_pct: float

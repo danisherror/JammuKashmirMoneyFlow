@@ -178,6 +178,7 @@ async def get_gap_analysis(
     Departments ranked by their unspent budget gap.
     Highlights where allocated money is NOT being spent.
     """
+    from database.models import Scheme, SchemeProgress
     rows = (await db.execute(
         select(Department, BudgetAllocation)
         .join(BudgetAllocation, and_(
@@ -202,7 +203,24 @@ async def get_gap_analysis(
         )
         utilized = exp_result.scalar() or 0
         budget = alloc.budget_estimate
-        gap = budget - utilized
+        
+        # Fetch PFMS Central Release from SchemeProgress
+        pfms_result = await db.execute(
+            select(func.sum(SchemeProgress.funds_released))
+            .join(Scheme, SchemeProgress.scheme_id == Scheme.id)
+            .where(
+                and_(
+                    Scheme.department_id == dept.id,
+                    SchemeProgress.financial_year == financial_year
+                )
+            )
+        )
+        released = pfms_result.scalar() or 0
+        
+        # We calculate the ultimate gap: Central Release vs Utilized
+        # However, for total gap tracking, if released is missing, default to budget
+        effective_release = max(released, budget) if released == 0 else released
+        gap = effective_release - utilized
         util_pct = round((utilized / budget * 100), 2) if budget > 0 else 0
 
         flag = "on_track"
@@ -216,6 +234,7 @@ async def get_gap_analysis(
             department_name=dept.name,
             department_code=dept.code,
             allocated_lakhs=budget,
+            released_lakhs=effective_release,
             utilized_lakhs=utilized,
             gap_lakhs=gap,
             utilization_pct=util_pct,

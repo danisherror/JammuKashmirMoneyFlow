@@ -171,12 +171,12 @@ export default function Overview() {
         {/* Gap Analysis Table */}
         {gaps && gaps.length > 0 && (
           <div className="panel">
-            <div className="panel-title">FUND GAP ANALYSIS — DEAD MONEY TRACKER</div>
+            <div className="panel-title">FUND GAP ANALYSIS — CENTRAL RELEASE TO UTILIZATION</div>
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead>
                   <tr className="border-b" style={{ borderColor: '#1a2a3a' }}>
-                    {['DEPARTMENT', 'ALLOCATED', 'UTILIZED', 'GAP', 'UTILIZATION', 'STATUS'].map(h => (
+                    {['DEPARTMENT', 'STATE RECEIPT', 'CENTRAL RELEASE', 'UTILIZED', 'PARKED GAP', 'UTILIZATION', 'STATUS'].map(h => (
                       <th key={h} className="mono text-[8px] text-dim text-left pb-2 pr-4 tracking-widest">{h}</th>
                     ))}
                   </tr>
@@ -189,11 +189,20 @@ export default function Overview() {
                         <div className="mono text-[10px]">{g.department_name.split('(')[0].trim()}</div>
                         <div className="mono text-[8px] text-dim">{g.department_code}</div>
                       </td>
-                      <td className="mono text-[10px] pr-4 text-blue">{fmtLakhs(g.allocated_lakhs)}</td>
-                      <td className="mono text-[10px] pr-4 text-green">{fmtLakhs(g.utilized_lakhs)}</td>
-                      <td className="mono text-[10px] pr-4 text-red">{fmtLakhs(g.gap_lakhs)}</td>
+                      <td className="mono text-[10px] pr-4 text-blue" title="Total Allocated to Department">
+                        {fmtLakhs(g.allocated_lakhs)}
+                      </td>
+                      <td className="mono text-[10px] pr-4 text-purple" title="Central Funds Released (via PFMS)">
+                        {fmtLakhs(g.released_lakhs)}
+                      </td>
+                      <td className="mono text-[10px] pr-4 text-green" title="Actual Amount Utilized on Ground">
+                        {fmtLakhs(g.utilized_lakhs)}
+                      </td>
+                      <td className="mono text-[10px] pr-4 text-red" title="Idle money parked (Central Release - Utilized)">
+                        {fmtLakhs(g.gap_lakhs)}
+                      </td>
                       <td className="pr-4" style={{ minWidth: 120 }}>
-                        <UtilBar allocated={g.allocated_lakhs} utilized={g.utilized_lakhs} showLabels={false} />
+                        <UtilBar allocated={g.released_lakhs > g.allocated_lakhs ? g.released_lakhs : g.allocated_lakhs} utilized={g.utilized_lakhs} showLabels={false} />
                         <div className={`mono text-[9px] mt-0.5 ${utilColor(g.utilization_pct)}`}>
                           {fmtPct(g.utilization_pct)}
                         </div>
