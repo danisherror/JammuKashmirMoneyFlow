@@ -9,6 +9,7 @@ import { fmtLakhs, fmtPct, utilColor, schemeBadge, schemeTypeLabel } from '../li
 import UtilBar from '../components/UtilBar'
 import PageHeader from '../components/PageHeader'
 import ErrorBox from '../components/ErrorBox'
+import MapWidget from '../components/MapWidget'
 import { ChevronLeft, ExternalLink } from 'lucide-react'
 
 export default function SchemeDetail() {
@@ -98,30 +99,42 @@ export default function SchemeDetail() {
               />
             </div>
 
-            {/* District chart */}
-            {districtChartData.length > 0 && (
-              <div className="panel">
-                <div className="panel-title">DISTRICT-WISE UTILIZATION %</div>
-                <ResponsiveContainer width="100%" height={220}>
-                  <BarChart data={districtChartData} barSize={18}>
-                    <XAxis dataKey="name" tick={{ fill: '#5a7a9a', fontSize: 9, fontFamily: 'Space Mono' }} />
-                    <YAxis domain={[0, 100]} tick={{ fill: '#5a7a9a', fontSize: 9, fontFamily: 'Space Mono' }}
-                      tickFormatter={v => `${v}%`} />
-                    <Tooltip
-                      formatter={(v: number, name: string) => [`${v.toFixed(1)}%`, name === 'utilized' ? 'Financial' : 'Physical']}
-                      contentStyle={{ background: '#0d1520', border: '1px solid #1a2a3a', fontFamily: 'Space Mono', fontSize: 10 }}
-                    />
-                    <Bar dataKey="utilized" name="utilized">
-                      {districtChartData.map((d, i) => (
-                        <Cell key={i}
-                          fill={d.utilized >= 75 ? 'rgba(0,255,136,0.6)' : d.utilized >= 40 ? 'rgba(255,215,0,0.6)' : 'rgba(255,51,102,0.6)'}
-                          stroke={d.utilized >= 75 ? '#00ff88' : d.utilized >= 40 ? '#ffd700' : '#ff3366'}
-                          strokeWidth={1}
-                        />
-                      ))}
-                    </Bar>
-                  </BarChart>
-                </ResponsiveContainer>
+            {/* District Map and Chart Grid */}
+            {data.district_progress.length > 0 && (
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+
+                {/* District Map */}
+                <div className="panel p-0 flex flex-col">
+                  <div className="panel-title p-4 pb-0 mb-0">DISTRICT MAP (FUNDS ALLOCATED & UTILIZED)</div>
+                  <div className="flex-1 min-h-[300px]">
+                    <MapWidget data={data.district_progress} height={350} />
+                  </div>
+                </div>
+
+                {/* District chart */}
+                <div className="panel">
+                  <div className="panel-title">DISTRICT-WISE UTILIZATION %</div>
+                  <ResponsiveContainer width="100%" height={300}>
+                    <BarChart data={districtChartData} barSize={18} margin={{ top: 20, right: 20, left: -20, bottom: 20 }}>
+                      <XAxis dataKey="name" tick={{ fill: '#5a7a9a', fontSize: 9, fontFamily: 'Space Mono' }} />
+                      <YAxis domain={[0, 100]} tick={{ fill: '#5a7a9a', fontSize: 9, fontFamily: 'Space Mono' }}
+                        tickFormatter={v => `${v}%`} />
+                      <Tooltip
+                        formatter={(v: number, name: string) => [`${v.toFixed(1)}%`, name === 'utilized' ? 'Financial' : 'Physical']}
+                        contentStyle={{ background: '#0d1520', border: '1px solid #1a2a3a', fontFamily: 'Space Mono', fontSize: 10 }}
+                      />
+                      <Bar dataKey="utilized" name="utilized">
+                        {districtChartData.map((d, i) => (
+                          <Cell key={i}
+                            fill={d.utilized >= 75 ? 'rgba(0,255,136,0.6)' : d.utilized >= 40 ? 'rgba(255,215,0,0.6)' : 'rgba(255,51,102,0.6)'}
+                            stroke={d.utilized >= 75 ? '#00ff88' : d.utilized >= 40 ? '#ffd700' : '#ff3366'}
+                            strokeWidth={1}
+                          />
+                        ))}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
               </div>
             )}
 
@@ -143,7 +156,7 @@ export default function SchemeDetail() {
                         <tr key={d.district_id} className="border-b hover:bg-white/5 transition-colors"
                           style={{ borderColor: '#1a2a3a' }}>
                           <td className="py-2 pr-4 mono text-[10px]">{d.district_name}</td>
-                          <td className="pr-4 mono text-[8px] text-dim">{d.division.slice(0,3).toUpperCase()}</td>
+                          <td className="pr-4 mono text-[8px] text-dim">{d.division.slice(0, 3).toUpperCase()}</td>
                           <td className="pr-4 mono text-[9px] text-dim">{d.target_physical?.toLocaleString() ?? '—'}</td>
                           <td className="pr-4 mono text-[9px]">{d.achieved_physical?.toLocaleString() ?? '—'}</td>
                           <td className="pr-4">
