@@ -1,0 +1,133 @@
+import { useState } from 'react'
+import { useQuery } from '@tanstack/react-query'
+import { useNavigate } from 'react-router-dom'
+import { useAppStore } from '../store'
+import { fetchSchemes } from '../lib/api'
+import { fmtLakhs, fmtPct, utilColor, schemeBadge, schemeTypeLabel } from '../lib/utils'
+import UtilBar from '../components/UtilBar'
+import PageHeader from '../components/PageHeader'
+import LoadingGrid from '../components/LoadingGrid'
+import ErrorBox from '../components/ErrorBox'
+
+export default function Schemes() {
+  const { financialYear } = useAppStore()
+  const navigate = useNavigate()
+  const [typeFilter, setTypeFilter] = useState<string>('all')
+
+  const { data, isLoading, isError } = useQuery({
+    queryKey: ['schemes', financialYear, typeFilter],
+    queryFn: () => fetchSchemes(financialYear, typeFilter === 'all' ? undefined : typeFilter),
+  })
+
+  return (
+    <div>
+      <PageHeader
+        title="SCHEMES"
+        subtitle={`FLAGSHIP SCHEME FUND TRACKER — FY ${financialYear}`}
+        right={
+          <div className="flex items-center gap-2">
+            {[
+              { key: 'all', label: 'ALL' },
+              { key: 'css', label: 'CSS' },
+              { key: 'central', label: 'CENTRAL' },
+              { key: 'ut', label: 'UT' },
+            ].map(({ key, label }) => (
+              <button key={key} onClick={() => setTypeFilter(key)}
+                className={`mono text-[8px] px-3 py-1.5 tracking-widest border transition-colors ${
+                  typeFilter === key
+                    ? 'border-yellow-500/50 text-gold bg-yellow-900/20'
+                    : 'border-border text-dim hover:text-white hover:border-white/20'
+                }`}>
+                {label}
+              </button>
+            ))}
+          </div>
+        }
+      />
+
+      <div className="p-6">
+        {isLoading ? <LoadingGrid count={6} /> :
+         isError   ? <ErrorBox /> : (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            {(data ?? []).map(scheme => {
+              const util = scheme.utilization_pct
+              const phys = scheme.physical_pct
+              return (
+                <div
+                  key={scheme.id}
+                  onClick={() => navigate(`/schemes/${scheme.id}`)}
+                  className="panel cursor-pointer hover:border-yellow-500/30 transition-all group"
+                >
+                  <div className="flex items-start justify-between mb-3">
+                    <div className="flex-1 pr-2">
+                      <div className="mono text-[11px] font-bold text-white group-hover:text-gold transition-colors">
+                        {scheme.name}
+                      </div>
+                      <div className="mono text-[8px] text-dim mt-0.5">
+                        {scheme.department_name.split('(')[0].trim()}
+                      </div>
+                    </div>
+                    <div className="flex flex-col items-end gap-1 flex-shrink-0">
+                      <span className={schemeBadge(scheme.scheme_type)}>
+                        {schemeTypeLabel(scheme.scheme_type)}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Financial row */}
+                  <div className="grid grid-cols-3 gap-2 mb-3">
+                    {[
+                      { label: 'OUTLAY', val: scheme.total_outlay_lakhs, color: '#5a7a9a' },
+                      { label: 'ALLOCATED', val: scheme.funds_allocated_lakhs, color: '#00aaff' },
+                      { label: 'UTILIZED', val: scheme.funds_utilized_lakhs, color: util != null && util >= 60 ? '#00ff88' : util != null && util >= 30 ? '#ffd700' : '#ff3366' },
+                    ].map(({ label, val, color }) => (
+                      <div key={label}>
+                        <div className="mono text-[7px] text-dim mb-0.5 tracking-widest">{label}</div>
+                        <div className="display text-base" style={{ color }}>{fmtLakhs(val)}</div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Financial progress bar */}
+                  <UtilBar
+                    allocated={scheme.funds_allocated_lakhs ?? 1}
+                    utilized={scheme.funds_utilized_lakhs}
+                    showLabels={false}
+                  />
+
+                  {/* Physical progress if available */}
+                  {phys != null && (
+                    <div className="mt-2">
+                      <div className="flex justify-between mb-1">
+                        <span className="mono text-[7px] text-dim tracking-widest">PHYSICAL PROGRESS</span>
+                        <span className={`mono text-[8px] ${utilColor(phys)}`}>{fmtPct(phys)}</span>
+                      </div>
+                      <div className="h-1.5 w-full" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid #1a2a3a' }}>
+                        <div
+                          className="h-full transition-all duration-700"
+                          style={{
+                            width: `${Math.min(phys, 100)}%`,
+                            background: phys >= 75 ? '#00ff88' : phys >= 40 ? '#ffd700' : '#ff3366',
+                          }}
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="flex justify-between mt-2">
+                    <span className="mono text-[8px] text-dim">
+                      {scheme.last_updated ? `Updated: ${scheme.last_updated}` : 'No data yet'}
+                    </span>
+                    <span className={`mono text-[9px] ${utilColor(util)}`}>
+                      {fmtPct(util)} utilized
+                    </span>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
