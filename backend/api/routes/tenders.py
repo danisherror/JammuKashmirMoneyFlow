@@ -16,7 +16,7 @@ router = APIRouter(prefix="/tenders", tags=["Tenders"])
 
 @router.get("", response_model=list[TenderSummary])
 async def list_tenders(
-    limit: int = Query(100, ge=1, le=1000),
+    limit: int | None = Query(None),
     department_id: int | None = Query(None),
     status: str | None = Query(None),
     db: AsyncSession = Depends(get_db),
@@ -29,7 +29,8 @@ async def list_tenders(
     if status:
         query = query.where(Tender.status == status)
         
-    query = query.limit(limit)
+    if limit:
+        query = query.limit(limit)
     rows = (await db.execute(query)).scalars().all()
     
     return [

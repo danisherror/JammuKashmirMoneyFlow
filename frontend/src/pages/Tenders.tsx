@@ -13,7 +13,7 @@ export default function Tenders() {
 
   const { data: tenders, isLoading: loadingTenders, isError: errorTenders } = useQuery({
     queryKey: ['tenders'],
-    queryFn: () => fetchTenders(200), // bump limit so client-side filter works better
+    queryFn: () => fetchTenders(), // load all tenders without a limit
   })
 
   const { data: departments } = useQuery({

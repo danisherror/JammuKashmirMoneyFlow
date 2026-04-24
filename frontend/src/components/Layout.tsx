@@ -1,12 +1,15 @@
 import { NavLink, Outlet } from 'react-router-dom'
+import { useEffect, useState } from 'react'
 import { useAppStore } from '../store'
 import {
   LayoutDashboard, Building2, ListChecks,
   MapPin, Bell, Database, ChevronLeft, ChevronRight, Download,
-  FileText, Wallet
+  FileText, Wallet, Loader2
 } from 'lucide-react'
 import clsx from 'clsx'
 import DataFreshness from './DataFreshness'
+import { fetchBudgetOverview, triggerAllCollectors } from '../lib/api'
+import toast, { Toaster } from 'react-hot-toast'
 
 const NAV = [
   { to: '/',            icon: LayoutDashboard, label: 'Overview'    },
@@ -22,6 +25,47 @@ const NAV = [
 
 export default function Layout() {
   const { sidebarOpen, toggleSidebar, financialYear, setFinancialYear } = useAppStore()
+  const [isSyncing, setIsSyncing] = useState(false)
+
+  // Auto-fetch historical data if it is missing
+  useEffect(() => {
+    let mounted = true
+    
+    const checkAndSyncData = async () => {
+      try {
+        const overview = await fetchBudgetOverview(financialYear)
+        // If total budget is 0, we assume the data hasn't been scraped yet for this year
+        if (mounted && overview && overview.total_budget_lakhs === 0) {
+          setIsSyncing(true)
+          toast.loading(`Data for ${financialYear} missing. Starting background sync...`, { id: 'sync-toast' })
+          
+          await triggerAllCollectors(financialYear)
+          
+          toast.success(`Government portals are now being scraped for ${financialYear}. Data will populate shortly!`, { 
+            id: 'sync-toast', 
+            duration: 5000 
+          })
+          setIsSyncing(false)
+        }
+      } catch (e) {
+        console.error('Failed to check overview data:', e)
+        if (mounted) setIsSyncing(false)
+      }
+    }
+    
+    checkAndSyncData()
+    
+    return () => { mounted = false }
+  }, [financialYear])
+
+  // Generate financial years from current year down to 1947
+  const currentYear = new Date().getFullYear()
+  const startYear = 1947
+  const financialYears = []
+  for (let i = currentYear; i >= startYear; i--) {
+    const nextYear = (i + 1).toString().slice(-2)
+    financialYears.push(`${i}-${nextYear}`)
+  }
 
   return (
     <div className="flex h-screen overflow-hidden" style={{ position: 'relative', zIndex: 1 }}>
@@ -61,8 +105,9 @@ export default function Layout() {
               onChange={e => setFinancialYear(e.target.value)}
               className="w-full bg-slate-800/50 text-white border border-slate-700/50 rounded-lg px-3 py-2 outline-none focus:border-blue-500/50 transition-colors cursor-pointer"
             >
-              <option value="2024-25">2024-25</option>
-              <option value="2023-24">2023-24</option>
+              {financialYears.map(fy => (
+                <option key={fy} value={fy}>{fy}</option>
+              ))}
             </select>
           </div>
         )}
@@ -100,7 +145,26 @@ export default function Layout() {
       </aside>
 
       {/* Main content */}
-      <div className="flex-1 overflow-auto flex flex-col">
+      <div className="flex-1 overflow-auto flex flex-col relative">
+        <Toaster position="top-right" toastOptions={{
+          style: {
+            background: '#0f172a',
+            color: '#fff',
+            border: '1px solid var(--panel-border)',
+          }
+        }} />
+        
+        {/* Sync overlay */}
+        {isSyncing && (
+          <div className="absolute inset-0 z-50 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center pointer-events-none">
+            <div className="bg-slate-800 border border-slate-700 rounded-xl p-6 flex flex-col items-center shadow-2xl">
+              <Loader2 className="w-10 h-10 text-blue-500 animate-spin mb-4" />
+              <h3 className="text-lg font-bold text-white mb-2">Connecting to Govt Portals</h3>
+              <p className="text-sm text-slate-400">Scraping data for {financialYear}...</p>
+            </div>
+          </div>
+        )}
+
         {/* Data freshness strip — always visible on every page */}
         <DataFreshness />
         <div className="flex-1 overflow-auto">

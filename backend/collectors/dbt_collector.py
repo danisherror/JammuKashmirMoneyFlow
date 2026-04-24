@@ -19,9 +19,9 @@ DBT_URL = "https://dbtbharat.gov.in/data/statewise"
 class DBTCollector(BaseCollector):
     collector_name = "dbt_collector"
     
-    def __init__(self, db: Session, financial_years: list[str] = ["2023-24", "2024-25"]):
+    def __init__(self, db: Session, financial_year: str = "2024-25"):
         super().__init__(db)
-        self.financial_years = financial_years
+        self.financial_year = financial_year
 
     def run_collection(self):
         scheme = self.db.execute(
@@ -59,7 +59,7 @@ class DBTCollector(BaseCollector):
         districts = self.db.execute(select(District)).scalars().all()
         results = []
         
-        for fy in self.financial_years:
+        for fy in [self.financial_year]:
             for dist in districts:
                 # Roughly 10-15% of population receives some form of DBT (PM Kisan, scholarships, etc)
                 enrolled = int(dist.population * random.uniform(0.10, 0.15))

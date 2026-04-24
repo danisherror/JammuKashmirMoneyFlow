@@ -193,6 +193,26 @@ async def trigger_collector(
     }
 
 
+@router.post("/trigger-all")
+async def trigger_all_collectors(
+    background_tasks: BackgroundTasks,
+    financial_year: str = Query("2024-25"),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Manually trigger ALL collectors for a specific financial year.
+    Used by the frontend to auto-fetch historical data if it's missing.
+    """
+    from scheduler.jobs import run_all_for_year
+    background_tasks.add_task(run_all_for_year, financial_year)
+    
+    return {
+        "message": f"All collectors triggered in background for {financial_year}",
+        "started_at": datetime.now(timezone.utc).isoformat(),
+        "financial_year": financial_year
+    }
+
+
 @router.get("/cag-findings")
 async def get_cag_findings(
     limit: int = 50,

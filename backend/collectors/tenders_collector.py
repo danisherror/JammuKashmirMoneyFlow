@@ -52,8 +52,8 @@ class TendersCollector(BaseCollector):
         districts = self.db.execute(select(District)).scalars().all()
         results = []
         
-        # Generate 15-30 active/awarded tenders per run to simulate a day's worth of activity
-        num_tenders = random.randint(15, 30)
+        # Generate 50-100 active/awarded tenders per run to simulate a day's worth of activity, including small ones
+        num_tenders = random.randint(50, 100)
         
         for i in range(num_tenders):
             dept = random.choice(departments)
@@ -61,8 +61,9 @@ class TendersCollector(BaseCollector):
             
             is_awarded = random.choice([True, False])
             
-            # Cost in lakhs (from 5 lakhs to 5000 lakhs)
-            est_cost = int(random.uniform(5, 5000))
+            # Cost in lakhs (from 0.1 lakhs to 5000 lakhs, heavy weighting towards smaller tenders)
+            # Use beta distribution to skew towards small tenders
+            est_cost = round(0.1 + (random.betavariate(1, 5) * 5000), 2)
             
             status = "awarded" if is_awarded else "active"
             
@@ -71,7 +72,13 @@ class TendersCollector(BaseCollector):
                 f"Upgradation of Water Supply Scheme at {dist.name}",
                 f"Supply of Medical Equipment for District Hospital {dist.name}",
                 f"Renovation of School Building in {dist.name}",
-                f"Laying of HT/LT lines in {dist.name} district"
+                f"Laying of HT/LT lines in {dist.name} district",
+                f"Supply of Stationery Items for Office in {dist.name}",
+                f"Minor Repairs of Panchayat Ghar in {dist.name}",
+                f"Installation of CCTV Cameras at {dist.name} block",
+                f"Procurement of IT Equipment and Printers for {dept.name}",
+                f"Annual Maintenance Contract for Vehicles in {dist.name}",
+                f"Painting and Whitewashing of Govt Building in {dist.name}"
             ]
             
             today = date.today()
@@ -93,7 +100,7 @@ class TendersCollector(BaseCollector):
             }
             
             if is_awarded:
-                tender["awarded_cost"] = int(est_cost * random.uniform(0.85, 1.05))
+                tender["awarded_cost"] = round(est_cost * random.uniform(0.85, 1.05), 2)
                 tender["contractor_name"] = f"M/S {random.choice(['Singh', 'Ahmad', 'Sharma', 'Khan', 'Gupta', 'Dar'])} Constructions"
                 tender["award_date"] = bid_end + timedelta(days=random.randint(5, 30))
             else:

@@ -92,6 +92,29 @@ def run_all_daily():
     run_pfms()
     logger.info("⏰ Scheduler: Daily collection run complete")
 
+def run_all_for_year(financial_year: str):
+    """
+    Runs all collectors for a specific financial year.
+    Useful when a user requests a historical year that has no data.
+    """
+    logger.info(f"⏰ Trigger: Collection run starting for {financial_year}")
+    _run_collector(MGNREGACollector, financial_year=financial_year)
+    _run_collector(JJMCollector, financial_year=financial_year)
+    _run_collector(PMAYCollector, financial_year=financial_year)
+    _run_collector(DBTCollector, financial_year=financial_year)
+    # Tenders, CGA, PFMS, CAG don't usually accept financial_year parameters in the same way,
+    # or they fetch a fixed window. We pass it if they support it, but we can just run the supported ones.
+    # We will trigger them just in case they have been updated to support it.
+    try:
+        _run_collector(TendersCollector)
+        _run_collector(CGACollector)
+        _run_collector(PFMSCollector)
+        _run_collector(CAGCollector)
+    except Exception as e:
+        logger.warning(f"Error running non-year specific collector: {e}")
+        
+    logger.info(f"⏰ Trigger: Collection run complete for {financial_year}")
+
 
 def create_scheduler() -> BackgroundScheduler:
     scheduler = BackgroundScheduler(timezone="Asia/Kolkata")
