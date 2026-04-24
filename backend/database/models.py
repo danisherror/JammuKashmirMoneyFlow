@@ -50,7 +50,8 @@ class Department(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     # Relationships
-    children = relationship("Department", backref="parent", foreign_keys=[parent_id])
+    parent = relationship("Department", remote_side=[id], back_populates="children")
+    children = relationship("Department", back_populates="parent")
     allocations = relationship("BudgetAllocation", back_populates="department")
     expenditures = relationship("Expenditure", back_populates="department")
     schemes = relationship("Scheme", back_populates="department")
