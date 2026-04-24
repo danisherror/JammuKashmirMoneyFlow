@@ -15,6 +15,7 @@ from collectors.jjm_collector import JJMCollector
 from collectors.pmay_collector import PMAYCollector
 from collectors.dbt_collector import DBTCollector
 from collectors.tenders_collector import TendersCollector
+from collectors.cga_collector import CGACollector
 from processors.gap_calculator import recalculate_all_gaps
 
 settings = get_settings()
@@ -61,6 +62,10 @@ def run_tenders():
     logger.info("⏰ Scheduler: Tenders collection starting")
     _run_collector(TendersCollector)
 
+def run_cga():
+    logger.info("⏰ Scheduler: CGA collection starting")
+    _run_collector(CGACollector)
+
 def run_all_daily():
     """
     Master daily job — runs all collectors.
@@ -95,6 +100,21 @@ def create_scheduler() -> BackgroundScheduler:
         name="Weekly: All Collectors",
         replace_existing=True,
         misfire_grace_time=3600,    # if server was down, run within 1 hour of missed time
+    )
+
+    # Monthly run for CGA (expenditure PDFs) on the 26th at 8:00 AM IST
+    scheduler.add_job(
+        run_cga,
+        trigger=CronTrigger(
+            day="26",
+            hour=8,
+            minute=0,
+            timezone="Asia/Kolkata",
+        ),
+        id="monthly_cga",
+        name="Monthly: CGA Budget Collector",
+        replace_existing=True,
+        misfire_grace_time=86400,   # 1 day grace time
     )
 
     logger.info(

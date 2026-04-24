@@ -19,6 +19,10 @@ router = APIRouter(prefix="/alerts", tags=["Alerts"])
 COLLECTOR_MAP = {
     "mgnrega": "scheduler.jobs.run_mgnrega",
     "jjm": "scheduler.jobs.run_jjm",
+    "pmay": "scheduler.jobs.run_pmay",
+    "dbt": "scheduler.jobs.run_dbt",
+    "tenders": "scheduler.jobs.run_tenders",
+    "cga": "scheduler.jobs.run_cga",
 }
 
 
@@ -157,6 +161,9 @@ async def trigger_collector(
     elif collector_name == "jjm":
         from scheduler.jobs import run_jjm
         background_tasks.add_task(run_jjm)
+    elif collector_name == "cga":
+        from scheduler.jobs import run_cga
+        background_tasks.add_task(run_cga)
 
     return {
         "message": f"Collector '{collector_name}' triggered in background",

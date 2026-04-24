@@ -62,13 +62,22 @@ const COLLECTORS: CollectorDef[] = [
     phase:       1,
   },
   {
+    name:        'cga_collector',
+    label:       'BUDGET EXPENDITURE (CGA)',
+    trigger_key: 'cga',
+    source:      'cga.nic.in',
+    source_url:  'https://cga.nic.in',
+    schedule:    'Monthly (26th 8:00 AM)',
+    phase:       2,
+  },
+  {
     name:        'cag_collector',
     label:       'CAG AUDIT REPORTS',
     trigger_key: null,
     source:      'cag.gov.in',
     source_url:  'https://cag.gov.in/en/audit-report?tags=Jammu+%26+Kashmir',
-    schedule:    'Monthly (Phase 2)',
-    phase:       2,
+    schedule:    'Monthly (Phase 3)',
+    phase:       3,
   },
 ]
 
