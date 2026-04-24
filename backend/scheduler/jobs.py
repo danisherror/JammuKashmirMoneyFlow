@@ -16,6 +16,7 @@ from collectors.pmay_collector import PMAYCollector
 from collectors.dbt_collector import DBTCollector
 from collectors.tenders_collector import TendersCollector
 from collectors.cga_collector import CGACollector
+from collectors.cag_collector import CAGCollector
 from processors.gap_calculator import recalculate_all_gaps
 
 settings = get_settings()
@@ -65,6 +66,10 @@ def run_tenders():
 def run_cga():
     logger.info("⏰ Scheduler: CGA collection starting")
     _run_collector(CGACollector)
+
+def run_cag_audit():
+    logger.info("⏰ Scheduler: CAG Audit collection starting")
+    _run_collector(CAGCollector)
 
 def run_all_daily():
     """

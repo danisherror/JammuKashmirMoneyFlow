@@ -25,6 +25,16 @@ class Settings(BaseSettings):
     cache_ttl_medium: int = 86400
     cache_ttl_long: int = 604800
 
+    # Alerts & Notifications
+    alert_telegram_token: str | None = None
+    alert_telegram_chat_id: str | None = None
+    alert_email_smtp_url: str | None = None
+    critical_gap_threshold_pct: int = 20
+    warning_gap_threshold_pct: int = 40
+
+    # AI Integration
+    gemini_api_key: str | None = None
+
     class Config:
         env_file = ".env"
         case_sensitive = False

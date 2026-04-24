@@ -23,6 +23,7 @@ COLLECTOR_MAP = {
     "dbt": "scheduler.jobs.run_dbt",
     "tenders": "scheduler.jobs.run_tenders",
     "cga": "scheduler.jobs.run_cga",
+    "cag": "scheduler.jobs.run_cag_audit",
 }
 
 
@@ -164,8 +165,44 @@ async def trigger_collector(
     elif collector_name == "cga":
         from scheduler.jobs import run_cga
         background_tasks.add_task(run_cga)
+    elif collector_name == "cag":
+        from scheduler.jobs import run_cag_audit
+        background_tasks.add_task(run_cag_audit)
 
     return {
         "message": f"Collector '{collector_name}' triggered in background",
         "started_at": datetime.now(timezone.utc).isoformat(),
     }
+
+
+@router.get("/cag-findings")
+async def get_cag_findings(
+    limit: int = 50,
+    db: AsyncSession = Depends(get_db),
+):
+    """Return CAG audit findings for the feed UI."""
+    from database.models import CAGFinding
+    from sqlalchemy import desc
+
+    rows = (await db.execute(
+        select(CAGFinding)
+        .order_by(desc(CAGFinding.report_year), desc(CAGFinding.id))
+        .limit(limit)
+    )).scalars().all()
+
+    return [
+        {
+            "id": r.id,
+            "report_year": r.report_year,
+            "report_title": r.report_title,
+            "department_name": r.department_name_raw,
+            "finding_summary": r.finding_summary,
+            "finding_raw": r.finding_raw,
+            "amount_flagged_lakhs": r.amount_flagged,
+            "severity": r.severity,
+            "paragraph_ref": r.paragraph_ref,
+            "source_pdf_url": r.source_pdf_url,
+        }
+        for r in rows
+    ]
+
