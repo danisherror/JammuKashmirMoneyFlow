@@ -9,6 +9,7 @@ import Districts from './pages/Districts'
 import DistrictDetail from './pages/DistrictDetail'
 import Alerts from './pages/Alerts'
 import SyncStatus from './pages/SyncStatus'
+import Export from './pages/Export'
 
 export default function App() {
   return (
@@ -23,6 +24,7 @@ export default function App() {
         <Route path="districts/:id" element={<DistrictDetail />} />
         <Route path="alerts"      element={<Alerts />} />
         <Route path="sync"        element={<SyncStatus />} />
+        <Route path="export"      element={<Export />} />
       </Route>
     </Routes>
   )
