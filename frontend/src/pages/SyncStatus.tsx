@@ -73,7 +73,7 @@ const COLLECTORS: CollectorDef[] = [
   {
     name:        'cag_collector',
     label:       'CAG AUDIT REPORTS',
-    trigger_key: null,
+    trigger_key: 'cag',
     source:      'cag.gov.in',
     source_url:  'https://cag.gov.in/en/audit-report?tags=Jammu+%26+Kashmir',
     schedule:    'Monthly (Phase 3)',

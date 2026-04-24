@@ -6,7 +6,7 @@ import {
 import { useAppStore } from '../store'
 import {
   fetchBudgetOverview, fetchDepartments,
-  fetchGapAnalysis, fetchLowUtilAlerts
+  fetchGapAnalysis, fetchLowUtilAlerts, fetchSchemes
 } from '../lib/api'
 import { fmtLakhs, fmtPct, utilColor } from '../lib/utils'
 import KpiCard from '../components/KpiCard'
@@ -14,6 +14,7 @@ import UtilBar from '../components/UtilBar'
 import PageHeader from '../components/PageHeader'
 import LoadingGrid from '../components/LoadingGrid'
 import ErrorBox from '../components/ErrorBox'
+import BudgetSankey from '../components/BudgetSankey'
 
 const COLORS = ['#00ff88', '#00aaff', '#ffd700', '#ff6432', '#ff3366', '#aa44ff']
 
@@ -43,6 +44,9 @@ export default function Overview() {
 
   const { data: alerts } =
     useQuery({ queryKey: ['low-util-alerts', financialYear], queryFn: () => fetchLowUtilAlerts(financialYear) })
+
+  const { data: schemes } =
+    useQuery({ queryKey: ['schemes', financialYear], queryFn: () => fetchSchemes(financialYear) })
 
   const top10Depts = departments?.slice(0, 10) ?? []
   const criticalCount  = alerts?.filter(a => a.severity === 'critical').length ?? 0
@@ -101,6 +105,17 @@ export default function Overview() {
             )}
           </div>
         )}
+
+        {/* Budget Flow Sankey Diagram */}
+        <div className="grid grid-cols-1 gap-4">
+          {overview && departments && schemes ? (
+            <BudgetSankey overview={overview} departments={departments} schemes={schemes} />
+          ) : (
+            <div className="panel xl:col-span-3 h-96 flex items-center justify-center mono text-[10px] text-dim">
+              Loading Flow Diagram...
+            </div>
+          )}
+        </div>
 
         {/* Charts Row */}
         <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
