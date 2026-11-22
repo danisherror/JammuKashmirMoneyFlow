@@ -5,6 +5,7 @@ import {
 import { format, parseISO } from 'date-fns'
 import type { SchemeVelocity } from '../lib/api'
 import { fmtLakhs } from '../lib/utils'
+import SourceBadge from './SourceBadge'
 
 interface VelocityChartProps {
   velocity: SchemeVelocity
@@ -62,7 +63,10 @@ export default function VelocityChart({ velocity }: VelocityChartProps) {
   return (
     <div className="panel space-y-4">
       <div className="flex items-start justify-between flex-wrap gap-3">
-        <div className="panel-title mb-0">SPENDING VELOCITY & PROJECTION</div>
+        <div className="flex items-center gap-2">
+          <div className="panel-title mb-0">SPENDING VELOCITY & PROJECTION</div>
+          <SourceBadge source={velocity.sources.history} />
+        </div>
         {/* Verdict badge */}
         <div
           className="mono text-[10px] font-bold px-4 py-2 flex items-center gap-2"

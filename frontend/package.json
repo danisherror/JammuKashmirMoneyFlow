@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test": "vitest run"
   },
   "dependencies": {
     "@tanstack/react-query": "5.100.1",
@@ -32,6 +33,7 @@
     "postcss": "8.5.10",
     "tailwindcss": "3.4.19",
     "typescript": "5.9.3",
-    "vite": "5.4.21"
+    "vite": "5.4.21",
+    "vitest": "2.1.9"
   }
 }

@@ -5,26 +5,27 @@ import { useAppStore } from '../store'
 import { fetchSchemes, fetchDepartments, type SchemeType } from '../lib/api'
 import { fmtLakhs, fmtPct, utilColor, schemeBadge, schemeTypeLabel } from '../lib/utils'
 import UtilBar from '../components/UtilBar'
+import SourceBadge from '../components/SourceBadge'
 import PageHeader from '../components/PageHeader'
 import LoadingGrid from '../components/LoadingGrid'
 import ErrorBox from '../components/ErrorBox'
 import { Search } from 'lucide-react'
 
 export default function Schemes() {
-  const { financialYear } = useAppStore()
+  const { financialYear, view } = useAppStore()
   const navigate = useNavigate()
   const [typeFilter, setTypeFilter] = useState<SchemeType | 'all'>('all')
   const [searchTerm, setSearchTerm] = useState('')
   const [deptFilter, setDeptFilter] = useState('all')
 
   const { data, isLoading, isError } = useQuery({
-    queryKey: ['schemes', financialYear, typeFilter],
-    queryFn: () => fetchSchemes(financialYear, typeFilter === 'all' ? undefined : typeFilter),
+    queryKey: ['schemes', financialYear, view, typeFilter],
+    queryFn: () => fetchSchemes(financialYear, view, typeFilter === 'all' ? undefined : typeFilter),
   })
 
   const { data: departments } = useQuery({
-    queryKey: ['departments', financialYear], // just for the list of names
-    queryFn: () => fetchDepartments(financialYear),
+    queryKey: ['departments', financialYear, view], // just for the list of names
+    queryFn: () => fetchDepartments(financialYear, view),
   })
 
   const filteredSchemes = useMemo(() => {
@@ -88,6 +89,12 @@ export default function Schemes() {
       />
 
       <div className="p-6">
+        {view === 'official' && (
+          <div className="panel border-l-2 border-emerald-500/40 mono text-[10px] text-dim mb-4">
+            The CAG accounts report by department grant, not by scheme, so there are no official scheme figures.
+            Switch to Live or Combined to see the portal figures (provisional).
+          </div>
+        )}
         {isLoading ? <LoadingGrid count={6} /> :
          isError   ? <ErrorBox /> : (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -119,13 +126,16 @@ export default function Schemes() {
                   {/* Financial row */}
                   <div className="grid grid-cols-4 gap-2 mb-3">
                     {[
-                      { label: 'OUTLAY', val: scheme.total_outlay_lakhs, color: '#5a7a9a' },
-                      { label: 'ALLOCATED', val: scheme.funds_allocated_lakhs, color: '#00aaff' },
-                      { label: 'RELEASED', val: scheme.funds_released_lakhs, color: '#b366ff' },
-                      { label: 'UTILIZED', val: scheme.funds_utilized_lakhs, color: util != null && util >= 60 ? '#00ff88' : util != null && util >= 30 ? '#ffd700' : '#ff3366' },
-                    ].map(({ label, val, color }) => (
+                      { key: 'total_outlay_lakhs', label: 'OUTLAY', val: scheme.total_outlay_lakhs, color: '#5a7a9a' },
+                      { key: 'funds_allocated_lakhs', label: 'ALLOCATED', val: scheme.funds_allocated_lakhs, color: '#00aaff' },
+                      { key: 'funds_released_lakhs', label: 'RELEASED', val: scheme.funds_released_lakhs, color: '#b366ff' },
+                      { key: 'funds_utilized_lakhs', label: 'UTILIZED', val: scheme.funds_utilized_lakhs, color: util != null && util >= 60 ? '#00ff88' : util != null && util >= 30 ? '#ffd700' : '#ff3366' },
+                    ].map(({ key, label, val, color }) => (
                       <div key={label}>
-                        <div className="mono text-[7px] text-dim mb-0.5 tracking-widest">{label}</div>
+                        <div className="flex items-center gap-1 mb-0.5 flex-wrap">
+                          <span className="mono text-[7px] text-dim tracking-widest">{label}</span>
+                          <SourceBadge source={scheme.sources[key]} value={val} />
+                        </div>
                         <div className="display text-base" style={{ color }}>{fmtLakhs(val)}</div>
                       </div>
                     ))}
@@ -133,7 +143,7 @@ export default function Schemes() {
 
                   {/* Financial progress bar */}
                   <UtilBar
-                    allocated={scheme.funds_allocated_lakhs ?? 1}
+                    allocated={scheme.funds_allocated_lakhs}
                     released={scheme.funds_released_lakhs}
                     utilized={scheme.funds_utilized_lakhs}
                     showLabels={false}

@@ -1,17 +1,20 @@
 import { fmtPct } from '../lib/utils'
 
 interface Props {
-  allocated: number
+  /** null when unknown: the bar stays empty rather than inventing a ratio. */
+  allocated: number | null
   released?: number | null
   utilized: number | null
   showLabels?: boolean
 }
 
 export default function UtilBar({ allocated, released, utilized, showLabels = true }: Props) {
+  const alloc = allocated ?? 0
   const rel = released ?? 0
   const util = utilized ?? 0
-  const relPct  = allocated > 0 ? Math.min((rel  / allocated) * 100, 100) : 0
-  const utilPct = allocated > 0 ? Math.min((util / allocated) * 100, 100) : 0
+  const relPct  = alloc > 0 ? Math.min((rel  / alloc) * 100, 100) : 0
+  const utilPct = alloc > 0 ? Math.min((util / alloc) * 100, 100) : 0
+  const known = alloc > 0 && utilized != null
 
   return (
     <div className="w-full">
@@ -22,7 +25,7 @@ export default function UtilBar({ allocated, released, utilized, showLabels = tr
             <span className="text-[9px] font-semibold text-blue-400 tracking-widest uppercase">Released</span>
           )}
           <span className="text-[9px] font-bold tracking-widest uppercase" style={{ color: utilPct >= 75 ? 'var(--accent-green)' : utilPct >= 40 ? 'var(--accent-gold)' : 'var(--accent-red)' }}>
-            {fmtPct(utilPct)} Utilized
+            {known ? `${fmtPct(utilPct)} Utilized` : 'No data'}
           </span>
         </div>
       )}

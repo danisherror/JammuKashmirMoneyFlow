@@ -1,12 +1,12 @@
-import React, { useMemo } from 'react'
+import { useMemo } from 'react'
 import { Sankey, Tooltip, ResponsiveContainer } from 'recharts'
-import { BudgetOverview, DepartmentSummary, SchemeSummary } from '../lib/api'
+import type { BudgetOverview, DepartmentSummary } from '../lib/api'
 import { fmtLakhs, fmtPct } from '../lib/utils'
+import SourceBadge from './SourceBadge'
 
 interface BudgetSankeyProps {
   overview: BudgetOverview
   departments: DepartmentSummary[]
-  schemes: SchemeSummary[]
 }
 
 const CustomTooltip = ({ active, payload, nodes }: any) => {
@@ -92,42 +92,32 @@ const CustomTooltip = ({ active, payload, nodes }: any) => {
   )
 }
 
-export default function BudgetSankey({ overview, departments, schemes }: BudgetSankeyProps) {
+/**
+ * Total budget → top departments → everything else. Only sourced figures are drawn: there is no
+ * published Central-vs-UT funding split here yet, so none is shown (an earlier version guessed one).
+ */
+export default function BudgetSankey({ overview, departments }: BudgetSankeyProps) {
+  const total = overview.total_budget_lakhs
+  const officialTotal = overview.sources.total_budget_lakhs?.source_type === 'official'
+
   const data = useMemo(() => {
-    if (!overview || !departments || !schemes) return { nodes: [], links: [] }
+    if (total == null || total <= 0) return { nodes: [], links: [] }
 
-    // 1. Calculate Central vs UT Revenue using scheme types
-    // We sum up the total_outlay_lakhs for CSS and CENTRAL schemes to represent Central Grants
-    // The rest of the total_budget_lakhs is treated as J&K Tax / Own Revenue
-    let centralGrants = 0
-    schemes.forEach(s => {
-      if ((s.scheme_type === 'css' || s.scheme_type === 'central') && s.total_outlay_lakhs) {
-        centralGrants += s.total_outlay_lakhs
-      }
-    })
+    const known = departments.filter(d => d.budget_estimate_lakhs != null && d.budget_estimate_lakhs > 0)
+    const topDepts = [...known].sort((a, b) => b.budget_estimate_lakhs! - a.budget_estimate_lakhs!).slice(0, 8)
+    const topSum = topDepts.reduce((sum, d) => sum + d.budget_estimate_lakhs!, 0)
+    const otherSum = Math.max(0, total - topSum)
 
-    // Fallback if no schemes found or central grants exceed total budget
-    if (centralGrants === 0) centralGrants = overview.total_budget_lakhs * 0.68
-    if (centralGrants > overview.total_budget_lakhs) centralGrants = overview.total_budget_lakhs * 0.8
-
-    const utRevenue = Math.max(0, overview.total_budget_lakhs - centralGrants)
-
-    // 2. Identify top departments and group others
-    const topDeptsCount = 8
-    const sortedDepts = [...departments].sort((a, b) => b.budget_estimate_lakhs - a.budget_estimate_lakhs)
-    const topDepts = sortedDepts.slice(0, topDeptsCount)
-
-    const topDeptsSum = topDepts.reduce((sum, d) => sum + d.budget_estimate_lakhs, 0)
-    const otherDeptsSum = Math.max(0, overview.total_budget_lakhs - topDeptsSum)
-
-    // 3. Build Nodes
     const nodes: any[] = [
-      { name: 'Central Govt', fill: 'var(--accent-blue)', type: 'Funding Source', totalBudget: overview.total_budget_lakhs }, // 0
-      { name: 'J&K Tax Revenue', fill: 'var(--accent-green)', type: 'Funding Source', totalBudget: overview.total_budget_lakhs }, // 1
-      { name: 'J&K Finance Dept', fill: 'var(--accent-gold)', type: 'Distributor', totalBudget: overview.total_budget_lakhs }, // 2
+      { name: officialTotal ? 'UT total (final grant)' : 'UT total', fill: 'var(--accent-gold)', type: 'Total', totalBudget: total },
     ]
+    const links: any[] = []
 
     topDepts.forEach(d => {
+      links.push({
+        source: 0, target: nodes.length, value: d.budget_estimate_lakhs!,
+        percentOfTotal: (d.budget_estimate_lakhs! / total) * 100,
+      })
       nodes.push({
         name: d.name.split(' (')[0].substring(0, 25),
         fill: '#64748b',
@@ -135,77 +125,52 @@ export default function BudgetSankey({ overview, departments, schemes }: BudgetS
         // undefined (not 0) when utilisation is unknown, so the tooltip hides it
         expenditure: d.utilized_lakhs ?? undefined,
         utilizationPct: d.utilization_pct ?? undefined,
-        totalBudget: overview.total_budget_lakhs
+        totalBudget: total,
       })
     })
 
-    if (otherDeptsSum > 0) {
+    if (otherSum > 0) {
+      links.push({ source: 0, target: nodes.length, value: otherSum, percentOfTotal: (otherSum / total) * 100 })
       nodes.push({
-        name: 'Other Departments',
+        name: officialTotal ? 'Other grants' : 'Other departments',
         fill: '#475569',
         type: 'Aggregated Group',
-        totalBudget: overview.total_budget_lakhs
-      })
-    }
-
-    // 4. Build Links
-    const links = []
-
-    if (centralGrants > 0) {
-      links.push({
-        source: 0, target: 2, value: centralGrants,
-        percentOfTotal: (centralGrants / overview.total_budget_lakhs) * 100
-      })
-    }
-
-    if (utRevenue > 0) {
-      links.push({
-        source: 1, target: 2, value: utRevenue,
-        percentOfTotal: (utRevenue / overview.total_budget_lakhs) * 100
-      })
-    }
-
-    let targetIndex = 3
-    topDepts.forEach(d => {
-      if (d.budget_estimate_lakhs > 0) {
-        links.push({
-          source: 2,
-          target: targetIndex,
-          value: d.budget_estimate_lakhs,
-          percentOfTotal: (d.budget_estimate_lakhs / overview.total_budget_lakhs) * 100
-        })
-      }
-      targetIndex++
-    })
-
-    if (otherDeptsSum > 0) {
-      links.push({
-        source: 2,
-        target: targetIndex, // This will correctly point to the 'Other Departments' node
-        value: otherDeptsSum,
-        percentOfTotal: (otherDeptsSum / overview.total_budget_lakhs) * 100
+        totalBudget: total,
       })
     }
 
     return { nodes, links }
-  }, [overview, departments, schemes])
-
-  if (data.nodes.length === 0) return null
+  }, [total, officialTotal, departments])
 
   return (
     <div className="panel xl:col-span-3">
-      <div className="panel-title">BUDGET FLOW: SOURCE TO ALLOCATION</div>
-      <ResponsiveContainer width="100%" height={400}>
-        <Sankey
-          data={data}
-          node={{ stroke: 'var(--panel-border)', strokeWidth: 1 }}
-          nodePadding={50}
-          margin={{ top: 20, right: 20, bottom: 20, left: 20 }}
-          link={{ stroke: 'rgba(255,255,255,0.1)' }}
-        >
-          <Tooltip content={<CustomTooltip nodes={data.nodes} />} />
-        </Sankey>
-      </ResponsiveContainer>
+      <div className="flex items-center justify-between gap-2">
+        <div className="panel-title">BUDGET FLOW: TOTAL TO DEPARTMENTS</div>
+        <SourceBadge source={overview.sources.total_budget_lakhs} />
+      </div>
+      {data.links.length === 0 ? (
+        <div className="h-40 flex items-center justify-center mono text-[10px] text-dim">
+          No budget total for FY {overview.financial_year} in this view
+        </div>
+      ) : (
+        <>
+          <ResponsiveContainer width="100%" height={400}>
+            <Sankey
+              data={data}
+              node={{ stroke: 'var(--panel-border)', strokeWidth: 1 }}
+              nodePadding={30}
+              margin={{ top: 20, right: 20, bottom: 20, left: 20 }}
+              link={{ stroke: 'rgba(255,255,255,0.1)' }}
+            >
+              <Tooltip content={<CustomTooltip nodes={data.nodes} />} />
+            </Sankey>
+          </ResponsiveContainer>
+          <div className="mono text-[9px] text-dim mt-1">
+            Each department uses its own source (see the Departments page for badges). The funding split between
+            Central transfers and J&amp;K&apos;s own revenue is not shown: no source for it has been loaded yet.
+          </div>
+        </>
+      )}
     </div>
   )
 }

@@ -4,20 +4,22 @@ import { useNavigate } from 'react-router-dom'
 import { useAppStore } from '../store'
 import { fetchDepartments } from '../lib/api'
 import { fmtLakhs, fmtPct, utilColor, divisionLabel } from '../lib/utils'
+import { fieldHeading } from '../lib/sources'
 import UtilBar from '../components/UtilBar'
+import SourceBadge from '../components/SourceBadge'
 import PageHeader from '../components/PageHeader'
 import LoadingGrid from '../components/LoadingGrid'
 import ErrorBox from '../components/ErrorBox'
 
 export default function Departments() {
-  const { financialYear } = useAppStore()
+  const { financialYear, view } = useAppStore()
   const navigate = useNavigate()
   const [filter, setFilter] = useState<string>('all')
   const [search, setSearch] = useState('')
 
   const { data, isLoading, isError } = useQuery({
-    queryKey: ['departments', financialYear],
-    queryFn: () => fetchDepartments(financialYear),
+    queryKey: ['departments', financialYear, view],
+    queryFn: () => fetchDepartments(financialYear, view),
   })
 
   const filtered = (data ?? []).filter(d => {
@@ -59,7 +61,14 @@ export default function Departments() {
         </div>
 
         {isLoading ? <LoadingGrid count={8} /> :
-         isError   ? <ErrorBox /> : (
+         isError   ? <ErrorBox /> :
+         filtered.length === 0 ? (
+          <div className="panel p-6 text-center mono text-[10px] text-dim">
+            {data?.length
+              ? 'No departments match this filter.'
+              : `No department figures for FY ${financialYear} in the ${view} view.`}
+          </div>
+         ) : (
           <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-3">
             {filtered.map(dept => (
               <div
@@ -67,10 +76,10 @@ export default function Departments() {
                 onClick={() => navigate(`/departments/${dept.id}`)}
                 className="panel cursor-pointer hover:border-yellow-500/30 transition-all group"
               >
-                {/* Top indicator bar */}
+                {/* Top indicator bar: capital / revenue, grey when the figure covers both (official) */}
                 <div style={{
                   position: 'absolute', top: 0, left: 0, right: 0, height: 2,
-                  background: dept.is_capital ? '#00aaff' : '#ffd700'
+                  background: dept.is_capital == null ? '#475569' : dept.is_capital ? '#00aaff' : '#ffd700'
                 }} />
 
                 <div className="flex items-start justify-between mb-3">
@@ -81,26 +90,36 @@ export default function Departments() {
                     <div className="mono text-[8px] text-dim mt-0.5 tracking-widest">{dept.code}</div>
                   </div>
                   <div className="flex flex-col items-end gap-1">
-                    <span className={`badge ${dept.is_capital ? 'badge-css' : 'badge-delay'}`}>
-                      {dept.is_capital ? 'CAPITAL' : 'REVENUE'}
-                    </span>
+                    {dept.is_capital != null && (
+                      <span className={`badge ${dept.is_capital ? 'badge-css' : 'badge-delay'}`}>
+                        {dept.is_capital ? 'CAPITAL' : 'REVENUE'}
+                      </span>
+                    )}
                     <span className="mono text-[8px] text-dim">{divisionLabel(dept.division)}</span>
                   </div>
                 </div>
 
                 <div className="flex justify-between items-end mb-2">
                   <div>
-                    <div className="mono text-[8px] text-dim mb-0.5">ALLOCATED</div>
+                    <div className="flex items-center gap-1.5 mb-0.5">
+                      <span className="mono text-[8px] text-dim uppercase">
+                        {fieldHeading(dept.sources.budget_estimate_lakhs, 'Allocated')}
+                      </span>
+                      <SourceBadge source={dept.sources.budget_estimate_lakhs} />
+                    </div>
                     <div className="display text-xl text-blue">{fmtLakhs(dept.budget_estimate_lakhs)}</div>
                   </div>
-                  {dept.utilized_lakhs != null && (
-                    <div className="text-right">
-                      <div className="mono text-[8px] text-dim mb-0.5">UTILIZED</div>
-                      <div className={`display text-xl ${utilColor(dept.utilization_pct)}`}>
-                        {fmtLakhs(dept.utilized_lakhs)}
-                      </div>
+                  <div className="text-right">
+                    <div className="flex items-center justify-end gap-1.5 mb-0.5">
+                      <SourceBadge source={dept.sources.utilized_lakhs} />
+                      <span className="mono text-[8px] text-dim uppercase">
+                        {fieldHeading(dept.sources.utilized_lakhs, 'Utilized')}
+                      </span>
                     </div>
-                  )}
+                    <div className={`display text-xl ${utilColor(dept.utilization_pct)}`}>
+                      {fmtLakhs(dept.utilized_lakhs)}
+                    </div>
+                  </div>
                 </div>
 
                 <UtilBar

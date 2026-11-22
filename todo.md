@@ -34,7 +34,7 @@ Work through the phases in order. Each phase lists the score it should unlock. A
 ### 0.3 Minimal CI from day one
 Phases 1–3 are heavy refactors. Without CI, regressions go unnoticed until Phase 4.
 - [x] Add `.github/workflows/ci.yml` running `ruff check backend`, `npm run build` (includes `tsc`) and `docker-compose build` on every push and PR. (Ruff is pinned in `backend/requirements-dev.txt`, configured in `backend/ruff.toml`; the existing 36 findings were fixed.)
-- [ ] Add each new check (pytest, vitest, mypy, e2e) to this workflow as soon as the phase that introduces it lands. Phase 4.3 then only finishes and gates it.
+- [ ] Add each new check (pytest, vitest, mypy, e2e) to this workflow as soon as the phase that introduces it lands. (pytest and vitest are in.) Phase 4.3 then only finishes and gates it.
 
 **Done when:** a PR that breaks the frontend build shows a red check on GitHub. ⏳ Workflow added 2026-11-22 and all three checks pass locally; not yet confirmed on GitHub (needs a push and a test PR).
 
@@ -158,7 +158,13 @@ Every figure carries its source label, e.g. "Official · Appropriation Accounts 
   - Missing figures are `null`, not 0, in every route touched (overview, departments, gap analysis, schemes). Gap analysis has a new `gap_flag: "no_data"`.
   - On the current database every 2023-24 department is flagged (live 55–88% below audited), because the seed allocations are made up (see 2.2). That's the flag doing its job.
   - **Open:** the official view lists only the 19 mapped departments. The 17 unmapped grants are counted in the overview total but have no route of their own yet.
-- [ ] **Step 3: dashboard.** A Live / Official / Combined switch in the header (kept in the URL so links can be shared) and a source badge on every figure. Flagged figures show both numbers on hover or tap. Also update `frontend/src/lib/api.ts` to match: money fields are now `number | null`, `is_capital` is `boolean | null` (null for official figures, so don't show them as "REVENUE"), and there are new `view`/`sources` fields and a `no_data` gap flag.
+- [x] **Step 3: dashboard.** A Live / Official / Combined switch in the header (kept in the URL so links can be shared) and a source badge on every figure. Flagged figures show both numbers on hover or tap. Also update `frontend/src/lib/api.ts` to match: money fields are now `number | null`, `is_capital` is `boolean | null` (null for official figures, so don't show them as "REVENUE"), and there are new `view`/`sources` fields and a `no_data` gap flag. Done 2026-11-22:
+  - Switch: `frontend/src/components/ViewSwitch.tsx`, in a bar above the data-freshness strip. `?view=` is always written to the URL (default included), so Back/Forward restore the view and a shared link opens in it; in-app links without it carry the current view over.
+  - Badges: `frontend/src/components/SourceBadge.tsx` on the Overview KPIs, Sankey, composition chart and gap table, Departments, Department detail (incl. monthly trend), Schemes, Scheme detail and the velocity chart. States: Official, Official ⚑ (mismatch), Live · prov., Unsourced (a value with no recorded source, e.g. the seed scheme outlays) and No data. Hover or tap shows the label, what the number measures, page, fetch time, mismatch text and a link to the source PDF.
+  - Official department figures are headed "Final grant" / "Gross expenditure", not "Allocated" / "Utilized".
+  - The Overview Sankey no longer invents a Central-vs-J&K-revenue split (it summed seed scheme outlays and fell back to a hardcoded 68%); it shows total → departments only until a sourced split is loaded.
+  - Pure helpers in `frontend/src/lib/sources.ts`, tested with vitest (`npm test`, added to CI).
+  - **Open:** badges link to the source URL, not the stored snapshot; add a snapshot download link once `GET /api/v1/snapshots/{id}` exists (1.4).
 - [ ] **Step 4: mismatch page.** List every Live-vs-Official difference above the threshold, next to the Alerts page.
 - [ ] Portals report by scheme and the PDFs by department grant, so Combined can only compare them at department level, through `grant_department_map`. Until scheme spending can be added up per grant, show scheme-level figures as Live only.
 

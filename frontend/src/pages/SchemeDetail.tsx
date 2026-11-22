@@ -7,6 +7,7 @@ import { useAppStore } from '../store'
 import { fetchSchemeDetail, fetchSchemeHistory } from '../lib/api'
 import { fmtLakhs, fmtPct, utilColor, utilColorVar, schemeBadge, schemeTypeLabel } from '../lib/utils'
 import UtilBar from '../components/UtilBar'
+import SourceBadge from '../components/SourceBadge'
 import PageHeader from '../components/PageHeader'
 import ErrorBox from '../components/ErrorBox'
 import MapWidget from '../components/MapWidget'
@@ -15,17 +16,17 @@ import { ChevronLeft, ExternalLink } from 'lucide-react'
 
 export default function SchemeDetail() {
   const { id } = useParams<{ id: string }>()
-  const { financialYear } = useAppStore()
+  const { financialYear, view } = useAppStore()
 
   const { data, isLoading, isError } = useQuery({
-    queryKey: ['scheme-detail', id, financialYear],
-    queryFn: () => fetchSchemeDetail(Number(id), financialYear),
+    queryKey: ['scheme-detail', id, financialYear, view],
+    queryFn: () => fetchSchemeDetail(Number(id), financialYear, view),
     enabled: !!id,
   })
 
   const { data: velocity } = useQuery({
-    queryKey: ['scheme-velocity', id, financialYear],
-    queryFn: () => fetchSchemeHistory(Number(id), financialYear),
+    queryKey: ['scheme-velocity', id, financialYear, view],
+    queryFn: () => fetchSchemeHistory(Number(id), financialYear, view),
     enabled: !!id,
   })
 
@@ -73,6 +74,12 @@ export default function SchemeDetail() {
 
         {data && (
           <>
+            {view === 'official' && (
+          <div className="panel border-l-2 border-emerald-500/40 mono text-[10px] text-dim">
+            The CAG accounts report by department grant, not by scheme, so there are no official scheme figures.
+            Switch to Live or Combined to see the portal figures (provisional).
+          </div>
+        )}
             {data.description && (
               <div className="panel border-l-2 border-yellow-500/30">
                 <p className="mono text-[10px] text-dim leading-relaxed">{data.description}</p>
@@ -82,14 +89,17 @@ export default function SchemeDetail() {
             {/* KPIs */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               {[
-                { label: 'TOTAL OUTLAY', val: data.total_outlay_lakhs, fmt: 'lakhs', color: '#5a7a9a' },
-                { label: 'FUNDS ALLOCATED', val: data.funds_allocated_lakhs, fmt: 'lakhs', color: '#00aaff' },
-                { label: 'FUNDS UTILIZED', val: data.funds_utilized_lakhs, fmt: 'lakhs', color: data.utilization_pct && data.utilization_pct >= 50 ? '#00ff88' : '#ff3366' },
-                { label: 'PHYSICAL PROGRESS', val: data.physical_pct, fmt: 'pct', color: utilColorVar(data.physical_pct) },
-              ].map(({ label, val, fmt, color }) => (
+                { key: 'total_outlay_lakhs', label: 'TOTAL OUTLAY', val: data.total_outlay_lakhs, fmt: 'lakhs', color: '#5a7a9a' },
+                { key: 'funds_allocated_lakhs', label: 'FUNDS ALLOCATED', val: data.funds_allocated_lakhs, fmt: 'lakhs', color: '#00aaff' },
+                { key: 'funds_utilized_lakhs', label: 'FUNDS UTILIZED', val: data.funds_utilized_lakhs, fmt: 'lakhs', color: data.utilization_pct && data.utilization_pct >= 50 ? '#00ff88' : '#ff3366' },
+                { key: 'physical_pct', label: 'PHYSICAL PROGRESS', val: data.physical_pct, fmt: 'pct', color: utilColorVar(data.physical_pct) },
+              ].map(({ key, label, val, fmt, color }) => (
                 <div key={label} className="panel">
                   <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 2, background: color }} />
-                  <div className="mono text-[8px] text-dim tracking-widest mb-2">{label}</div>
+                  <div className="flex items-center justify-between gap-2 mb-2">
+                    <div className="mono text-[8px] text-dim tracking-widest">{label}</div>
+                    <SourceBadge source={data.sources[key]} value={val} />
+                  </div>
                   <div className="display text-2xl" style={{ color }}>
                     {fmt === 'lakhs' ? fmtLakhs(val as number) : fmtPct(val as number)}
                   </div>
@@ -104,7 +114,7 @@ export default function SchemeDetail() {
             <div className="panel">
               <div className="panel-title">OVERALL UTILIZATION — ALL DISTRICTS</div>
               <UtilBar
-                allocated={data.funds_allocated_lakhs ?? 1}
+                allocated={data.funds_allocated_lakhs}
                 released={data.funds_released_lakhs}
                 utilized={data.funds_utilized_lakhs}
               />
@@ -152,7 +162,10 @@ export default function SchemeDetail() {
             {/* District table */}
             {data.district_progress.length > 0 && (
               <div className="panel">
-                <div className="panel-title">DISTRICT-WISE BREAKDOWN</div>
+                <div className="flex items-center justify-between gap-2">
+                  <div className="panel-title">DISTRICT-WISE BREAKDOWN</div>
+                  <SourceBadge source={data.sources.district_progress} />
+                </div>
                 <div className="overflow-x-auto">
                   <table className="w-full">
                     <thead>

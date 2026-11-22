@@ -6,7 +6,9 @@ import {
 import { useAppStore } from '../store'
 import { fetchDepartmentDetail } from '../lib/api'
 import { fmtLakhs, fmtPct, utilColor, divisionLabel } from '../lib/utils'
+import { fieldHeading } from '../lib/sources'
 import UtilBar from '../components/UtilBar'
+import SourceBadge from '../components/SourceBadge'
 import PageHeader from '../components/PageHeader'
 import ErrorBox from '../components/ErrorBox'
 import { ChevronLeft } from 'lucide-react'
@@ -15,15 +17,15 @@ const MONTH_NAMES = ['Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec','Jan'
 
 export default function DepartmentDetail() {
   const { id } = useParams<{ id: string }>()
-  const { financialYear } = useAppStore()
+  const { financialYear, view } = useAppStore()
 
   const { data, isLoading, isError } = useQuery({
-    queryKey: ['dept-detail', id, financialYear],
-    queryFn: () => fetchDepartmentDetail(Number(id), financialYear),
+    queryKey: ['dept-detail', id, financialYear, view],
+    queryFn: () => fetchDepartmentDetail(Number(id), financialYear, view),
     enabled: !!id,
   })
 
-  const monthlyData = data?.monthly_expenditure?.map((m: any) => ({
+  const monthlyData = data?.monthly_expenditure?.map(m => ({
     month: MONTH_NAMES[m.month - 1] ?? `M${m.month}`,
     amount: m.amount_lakhs,
   })) ?? []
@@ -53,17 +55,20 @@ export default function DepartmentDetail() {
             {/* KPI row */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               {[
-                { label: 'BUDGET ESTIMATE', val: data.budget_estimate_lakhs, fmt: 'lakhs', dir: 'neutral' },
-                { label: 'REVISED ESTIMATE', val: data.revised_estimate_lakhs, fmt: 'lakhs', dir: 'neutral' },
-                { label: 'UTILIZED SO FAR', val: data.utilized_lakhs, fmt: 'lakhs', dir: data.utilization_pct && data.utilization_pct > 50 ? 'up' : 'down' },
-                { label: 'UTILIZATION', val: data.utilization_pct, fmt: 'pct', dir: data.utilization_pct && data.utilization_pct > 50 ? 'up' : 'down' },
-              ].map(({ label, val, fmt, dir }) => {
+                { label: fieldHeading(data.sources.budget_estimate_lakhs, 'Budget estimate'), val: data.budget_estimate_lakhs, fmt: 'lakhs', dir: 'neutral', source: data.sources.budget_estimate_lakhs },
+                { label: 'Revised estimate', val: data.revised_estimate_lakhs, fmt: 'lakhs', dir: 'neutral', source: data.sources.revised_estimate_lakhs },
+                { label: fieldHeading(data.sources.utilized_lakhs, 'Utilized so far'), val: data.utilized_lakhs, fmt: 'lakhs', dir: data.utilization_pct && data.utilization_pct > 50 ? 'up' : 'down', source: data.sources.utilized_lakhs },
+                { label: 'Utilization', val: data.utilization_pct, fmt: 'pct', dir: data.utilization_pct && data.utilization_pct > 50 ? 'up' : 'down', source: undefined },
+              ].map(({ label, val, fmt, dir, source }) => {
                 const display = fmt === 'lakhs' ? fmtLakhs(val) : fmtPct(val)
                 const color = dir === 'up' ? '#00ff88' : dir === 'down' ? '#ff3366' : '#ffd700'
                 return (
                   <div key={label} className="panel">
                     <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 2, background: color }} />
-                    <div className="mono text-[8px] text-dim tracking-widest mb-2">{label}</div>
+                    <div className="flex items-center justify-between gap-2 mb-2">
+                      <div className="mono text-[8px] text-dim tracking-widest uppercase">{label}</div>
+                      {source !== undefined && <SourceBadge source={source} />}
+                    </div>
                     <div className="display text-2xl" style={{ color }}>{display}</div>
                     <div className="mono text-[8px] text-dim mt-1">{divisionLabel(data.division)}</div>
                   </div>
@@ -87,7 +92,10 @@ export default function DepartmentDetail() {
             {/* Monthly chart */}
             {monthlyData.length > 0 && (
               <div className="panel">
-                <div className="panel-title">MONTHLY EXPENDITURE TREND</div>
+                <div className="flex items-center justify-between gap-2">
+                  <div className="panel-title">MONTHLY EXPENDITURE TREND</div>
+                  <SourceBadge source={data.sources.monthly_expenditure} />
+                </div>
                 <ResponsiveContainer width="100%" height={200}>
                   <AreaChart data={monthlyData}>
                     <defs>
@@ -113,9 +121,7 @@ export default function DepartmentDetail() {
             {monthlyData.length === 0 && (
               <div className="panel p-6 text-center">
                 <div className="mono text-[10px] text-dim">
-                  Monthly expenditure data populates after CGA runs (monthly, 26th of each month).
-                  Trigger it manually from the{' '}
-                  <a href="/sync" className="text-blue hover:underline">Sync Status page</a>.
+                  No monthly expenditure: {data.sources.monthly_expenditure?.label ?? `no figures for FY ${financialYear}`}.
                 </div>
               </div>
             )}

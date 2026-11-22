@@ -23,36 +23,75 @@ export type ISODate = string
 /** ISO datetime. */
 export type ISODateTime = string
 
+// ── Provenance (todo.md 2.2a) ─────────────────────────────────────────────────
+
+/** Which figures to show: portal collectors, CAG accounts, or the two merged (default). */
+export type View = 'live' | 'official' | 'combined'
+
+/** Set in the combined view when the portal and the audited accounts differ by more than 2%. */
+export interface MismatchInfo {
+  live: number
+  official: number
+  /** (live − official) / official × 100; null when official is 0. */
+  diff_pct: number | null
+}
+
+/** Where one figure comes from. `source_type` null means there is no data; `label` says why. */
+export interface FigureSource {
+  source_type: 'live' | 'official' | null
+  label: string
+  /** budget_estimate, revised_estimate, final_grant, gross_expenditure, utilized, released, allocated, total_outlay */
+  measure: string | null
+  source_url: string | null
+  snapshot_id: number | null
+  /** First page of the figure in the snapshot PDF. */
+  page: number | null
+  fetched_at: ISODateTime | null
+  provisional: boolean
+  mismatch: MismatchInfo | null
+}
+
+/** Fields shared by every response that carries per-figure provenance. */
+export interface Sourced {
+  view: View
+  /** Keyed by the figure's field name, e.g. `sources.total_budget_lakhs`. */
+  sources: Record<string, FigureSource>
+}
+
 // ── Budget ────────────────────────────────────────────────────────────────────
 
-export interface BudgetOverview {
+export interface BudgetOverview extends Sourced {
   financial_year: string
-  total_budget_lakhs: number
-  total_capital_lakhs: number
-  total_revenue_lakhs: number
-  capital_pct: number
-  revenue_pct: number
+  total_budget_lakhs: number | null
+  total_capital_lakhs: number | null
+  total_revenue_lakhs: number | null
+  capital_pct: number | null
+  revenue_pct: number | null
+  /** Official figures: number of CAG grants. */
   total_departments: number
   data_as_of: ISODate | null
 }
 
-export interface DepartmentSummary {
+export interface DepartmentSummary extends Sourced {
   id: number
   name: string
   code: string
   division: Division
   financial_year: string
-  budget_estimate_lakhs: number
+  /** Official figures: the final grant (original + supplementary); see `sources[...].measure`. */
+  budget_estimate_lakhs: number | null
   revised_estimate_lakhs: number | null
+  /** Official figures: gross expenditure. */
   utilized_lakhs: number | null
   utilization_pct: number | null
-  is_capital: boolean
+  /** null for official figures, which cover revenue + capital together. */
+  is_capital: boolean | null
   data_as_of: ISODate | null
 }
 
 export interface MonthlyExpenditure {
   month: number
-  amount: number
+  amount_lakhs: number
 }
 
 export interface DepartmentDetail extends DepartmentSummary {
@@ -61,23 +100,24 @@ export interface DepartmentDetail extends DepartmentSummary {
   year_over_year: { current: number; previous: number; change_pct: number | null } | null
 }
 
-export type GapFlag = 'critical' | 'warning' | 'on_track'
+export type GapFlag = 'critical' | 'warning' | 'on_track' | 'no_data'
 
-export interface GapAnalysisItem {
+export interface GapAnalysisItem extends Sourced {
   department_id: number
   department_name: string
   department_code: string
   allocated_lakhs: number
-  released_lakhs: number
-  utilized_lakhs: number
-  gap_lakhs: number
-  utilization_pct: number
+  /** null when no PFMS release figure exists. */
+  released_lakhs: number | null
+  utilized_lakhs: number | null
+  gap_lakhs: number | null
+  utilization_pct: number | null
   gap_flag: GapFlag
 }
 
 // ── Schemes ───────────────────────────────────────────────────────────────────
 
-export interface SchemeSummary {
+export interface SchemeSummary extends Sourced {
   id: number
   name: string
   code: string
@@ -128,7 +168,7 @@ export interface SchemeHistoryPoint {
 
 export type Verdict = 'ON TRACK' | 'AT RISK' | 'CRITICAL' | 'NO DATA'
 
-export interface SchemeVelocity {
+export interface SchemeVelocity extends Sourced {
   scheme_id: number
   scheme_name: string
   financial_year: string
@@ -265,42 +305,52 @@ const post = async <T>(url: string, params?: Record<string, unknown>): Promise<T
   (await api.post<T>(url, null, { params })).data
 
 // Budget
-export const fetchBudgetOverview = (financialYear: string) =>
-  get<BudgetOverview>('/budget/overview', { financial_year: financialYear })
+// Budget and scheme routes take `view` (todo.md 2.2a); the backend defaults to combined.
+export const fetchBudgetOverview = (financialYear: string, view?: View) =>
+  get<BudgetOverview>('/budget/overview', { financial_year: financialYear, view })
 
 export const fetchDepartments = (
   financialYear: string,
+  view?: View,
   division?: Division,
   sortBy?: 'budget_estimate' | 'utilization_pct',
 ) =>
   get<DepartmentSummary[]>('/budget/departments', {
     financial_year: financialYear,
+    view,
     division,
     sort_by: sortBy,
   })
 
-export const fetchDepartmentDetail = (id: number, financialYear: string) =>
-  get<DepartmentDetail>(`/budget/departments/${id}`, { financial_year: financialYear })
+export const fetchDepartmentDetail = (id: number, financialYear: string, view?: View) =>
+  get<DepartmentDetail>(`/budget/departments/${id}`, { financial_year: financialYear, view })
 
-export const fetchGapAnalysis = (financialYear: string, minAllocationLakhs?: number) =>
+export const fetchGapAnalysis = (financialYear: string, view?: View, minAllocationLakhs?: number) =>
   get<GapAnalysisItem[]>('/budget/gap-analysis', {
     financial_year: financialYear,
+    view,
     min_allocation_lakhs: minAllocationLakhs,
   })
 
 // Schemes
-export const fetchSchemes = (financialYear: string, schemeType?: SchemeType, departmentId?: number) =>
+export const fetchSchemes = (
+  financialYear: string,
+  view?: View,
+  schemeType?: SchemeType,
+  departmentId?: number,
+) =>
   get<SchemeSummary[]>('/schemes', {
     financial_year: financialYear,
+    view,
     scheme_type: schemeType,
     department_id: departmentId,
   })
 
-export const fetchSchemeDetail = (id: number, financialYear: string) =>
-  get<SchemeDetail>(`/schemes/${id}`, { financial_year: financialYear })
+export const fetchSchemeDetail = (id: number, financialYear: string, view?: View) =>
+  get<SchemeDetail>(`/schemes/${id}`, { financial_year: financialYear, view })
 
-export const fetchSchemeHistory = (id: number, financialYear: string) =>
-  get<SchemeVelocity>(`/schemes/${id}/history`, { financial_year: financialYear })
+export const fetchSchemeHistory = (id: number, financialYear: string, view?: View) =>
+  get<SchemeVelocity>(`/schemes/${id}/history`, { financial_year: financialYear, view })
 
 // Districts
 export const fetchDistrictHeatmap = (financialYear: string, schemeCode?: string) =>

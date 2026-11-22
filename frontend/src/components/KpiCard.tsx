@@ -1,5 +1,7 @@
 import clsx from 'clsx'
+import type { FigureSource } from '../lib/api'
 import { fmtLakhs, fmtPct } from '../lib/utils'
+import SourceBadge from './SourceBadge'
 
 interface Props {
   label: string
@@ -8,9 +10,11 @@ interface Props {
   direction?: 'up' | 'down' | 'neutral'
   format?: 'lakhs' | 'pct' | 'raw'
   className?: string
+  /** Where the figure comes from; shows a source badge when given (todo.md 2.2a). */
+  source?: FigureSource | null
 }
 
-export default function KpiCard({ label, value, sub, direction = 'neutral', format = 'raw', className }: Props) {
+export default function KpiCard({ label, value, sub, direction = 'neutral', format = 'raw', className, source }: Props) {
   const display =
     format === 'lakhs' ? fmtLakhs(value as number) :
     format === 'pct'   ? fmtPct(value as number) :
@@ -51,7 +55,10 @@ export default function KpiCard({ label, value, sub, direction = 'neutral', form
         }} 
       />
       
-      <div className="font-semibold text-[10px] text-slate-400 tracking-widest uppercase">{label}</div>
+      <div className="flex items-center justify-between gap-2">
+        <div className="font-semibold text-[10px] text-slate-400 tracking-widest uppercase">{label}</div>
+        {source !== undefined && <SourceBadge source={source} />}
+      </div>
       
       <div
         className="display text-4xl tracking-tight leading-none font-bold"

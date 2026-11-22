@@ -8,6 +8,7 @@ import {
 } from 'lucide-react'
 import clsx from 'clsx'
 import DataFreshness from './DataFreshness'
+import ViewSwitch from './ViewSwitch'
 import { fetchBudgetOverview, triggerAllCollectors } from '../lib/api'
 import toast, { Toaster } from 'react-hot-toast'
 
@@ -164,6 +165,11 @@ export default function Layout() {
             </div>
           </div>
         )}
+
+        {/* Live / Official / Combined switch — kept in the URL (todo.md 2.2a) */}
+        <div className="flex items-center px-6 py-2.5 border-b border-slate-700/50 bg-slate-900/40 backdrop-blur-md">
+          <ViewSwitch />
+        </div>
 
         {/* Data freshness strip — always visible on every page */}
         <DataFreshness />

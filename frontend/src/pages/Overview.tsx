@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
+import { Link } from 'react-router-dom'
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, Legend
@@ -6,9 +7,12 @@ import {
 import { useAppStore } from '../store'
 import {
   fetchBudgetOverview, fetchDepartments,
-  fetchGapAnalysis, fetchLowUtilAlerts, fetchSchemes
+  fetchGapAnalysis, fetchLowUtilAlerts
 } from '../lib/api'
 import { fmtLakhs, fmtPct, utilColor } from '../lib/utils'
+import { VIEWS, sourceKind, type SourceKind } from '../lib/sources'
+import type { DepartmentSummary, View } from '../lib/api'
+import SourceBadge from '../components/SourceBadge'
 import KpiCard from '../components/KpiCard'
 import UtilBar from '../components/UtilBar'
 import PageHeader from '../components/PageHeader'
@@ -17,6 +21,23 @@ import ErrorBox from '../components/ErrorBox'
 import BudgetSankey from '../components/BudgetSankey'
 
 const COLORS = ['#00ff88', '#00aaff', '#ffd700', '#ff6432', '#ff3366', '#aa44ff']
+
+/** Bar series names that say what the numbers are in each view. */
+const SERIES: Record<View, { alloc: string; util: string }> = {
+  live: { alloc: 'Allocated', util: 'Utilized' },
+  official: { alloc: 'Final grant', util: 'Gross expenditure' },
+  combined: { alloc: 'Allocated / final grant', util: 'Utilized / gross exp.' },
+}
+
+/** "12 official · 3 flagged · 5 live" for the departments behind a chart. */
+function sourceMix(depts: DepartmentSummary[]): string {
+  const counts: Record<SourceKind, number> = { official: 0, flagged: 0, live: 0, unsourced: 0, none: 0 }
+  depts.forEach(d => { counts[sourceKind(d.sources.budget_estimate_lakhs, d.budget_estimate_lakhs)]++ })
+  return ([
+    [counts.official, 'official'], [counts.flagged, 'flagged'], [counts.live, 'live'],
+    [counts.unsourced, 'unsourced'], [counts.none, 'no data'],
+  ] as const).filter(([n]) => n > 0).map(([n, l]) => `${n} ${l}`).join(' · ')
+}
 
 const CustomTooltip = ({ active, payload, label }: any) => {
   if (!active || !payload?.length) return null
@@ -31,28 +52,30 @@ const CustomTooltip = ({ active, payload, label }: any) => {
 }
 
 export default function Overview() {
-  const { financialYear } = useAppStore()
+  const { financialYear, view } = useAppStore()
 
   const { data: overview, isLoading: ovLoading, isError: ovError } =
-    useQuery({ queryKey: ['budget-overview', financialYear], queryFn: () => fetchBudgetOverview(financialYear) })
+    useQuery({ queryKey: ['budget-overview', financialYear, view], queryFn: () => fetchBudgetOverview(financialYear, view) })
 
   const { data: departments, isLoading: deptLoading } =
-    useQuery({ queryKey: ['departments', financialYear], queryFn: () => fetchDepartments(financialYear) })
+    useQuery({ queryKey: ['departments', financialYear, view], queryFn: () => fetchDepartments(financialYear, view) })
 
   const { data: gaps } =
-    useQuery({ queryKey: ['gap-analysis', financialYear], queryFn: () => fetchGapAnalysis(financialYear) })
+    useQuery({ queryKey: ['gap-analysis', financialYear, view], queryFn: () => fetchGapAnalysis(financialYear, view) })
 
   const { data: alerts } =
     useQuery({ queryKey: ['low-util-alerts', financialYear], queryFn: () => fetchLowUtilAlerts(financialYear) })
 
-  const { data: schemes } =
-    useQuery({ queryKey: ['schemes', financialYear], queryFn: () => fetchSchemes(financialYear) })
 
   const top10Depts = departments?.slice(0, 10) ?? []
   const criticalCount  = alerts?.filter(a => a.severity === 'critical').length ?? 0
   const warningCount   = alerts?.filter(a => a.severity === 'warning').length ?? 0
 
-  const pieData = overview ? [
+  const series = SERIES[view]
+  const totalSource = overview?.sources.total_budget_lakhs
+  const officialTotal = totalSource?.source_type === 'official'
+  // Only draw the pie when both parts are known; a missing part is not 0.
+  const pieData = overview && overview.total_capital_lakhs != null && overview.total_revenue_lakhs != null ? [
     { name: 'Capital', value: overview.total_capital_lakhs },
     { name: 'Revenue', value: overview.total_revenue_lakhs },
   ] : []
@@ -64,7 +87,7 @@ export default function Overview() {
         subtitle={`PUBLIC FUND TRACKER — FY ${financialYear} — JAMMU & KASHMIR UT`}
         right={
           <div className="flex items-center gap-2">
-            <span className="badge badge-live">LIVE</span>
+            <span className="badge badge-live">{VIEWS.find(v => v.value === view)?.label.toUpperCase()} VIEW</span>
             {criticalCount > 0 && (
               <span className="badge" style={{ background: 'rgba(255,51,102,0.15)', color: '#ff3366', border: '1px solid rgba(255,51,102,0.3)' }}>
                 ⚠ {criticalCount} CRITICAL
@@ -79,12 +102,17 @@ export default function Overview() {
         {/* KPI Row */}
         {ovLoading ? <LoadingGrid count={4} /> : ovError ? <ErrorBox /> : overview && (
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <KpiCard label="Total Budget" value={overview.total_budget_lakhs} format="lakhs" direction="neutral" />
-            <KpiCard label="Capital Expenditure" value={overview.total_capital_lakhs} format="lakhs" direction="up"
-              sub={`${fmtPct(overview.capital_pct)} of total`} />
-            <KpiCard label="Revenue Expenditure" value={overview.total_revenue_lakhs} format="lakhs" direction="neutral"
-              sub={`${fmtPct(overview.revenue_pct)} of total`} />
-            <KpiCard label="Funded Departments" value={overview.total_departments} direction="neutral"
+            <KpiCard label={officialTotal ? 'Total Final Grant' : 'Total Budget'} value={overview.total_budget_lakhs}
+              format="lakhs" direction="neutral" source={overview.sources.total_budget_lakhs}
+              sub={officialTotal ? 'Original + supplementary, all grants' : undefined} />
+            <KpiCard label="Capital" value={overview.total_capital_lakhs} format="lakhs" direction="up"
+              source={overview.sources.total_capital_lakhs}
+              sub={overview.capital_pct != null ? `${fmtPct(overview.capital_pct)} of total` : undefined} />
+            <KpiCard label="Revenue" value={overview.total_revenue_lakhs} format="lakhs" direction="neutral"
+              source={overview.sources.total_revenue_lakhs}
+              sub={overview.revenue_pct != null ? `${fmtPct(overview.revenue_pct)} of total` : undefined} />
+            <KpiCard label={officialTotal ? 'Grants (CAG)' : 'Funded Departments'}
+              value={overview.total_budget_lakhs == null ? null : overview.total_departments} direction="neutral"
               sub={`FY ${financialYear}`} />
           </div>
         )}
@@ -108,8 +136,8 @@ export default function Overview() {
 
         {/* Budget Flow Sankey Diagram */}
         <div className="grid grid-cols-1 gap-4">
-          {overview && departments && schemes ? (
-            <BudgetSankey overview={overview} departments={departments} schemes={schemes} />
+          {overview && departments ? (
+            <BudgetSankey overview={overview} departments={departments} />
           ) : (
             <div className="panel xl:col-span-3 h-96 flex items-center justify-center mono text-[10px] text-dim">
               Loading Flow Diagram...
@@ -122,22 +150,33 @@ export default function Overview() {
 
           {/* Top 10 Departments by allocation */}
           <div className="panel xl:col-span-2">
-            <div className="panel-title">TOP DEPARTMENTS BY ALLOCATION</div>
+            <div className="flex items-center justify-between gap-3">
+              <div className="panel-title">TOP DEPARTMENTS BY ALLOCATION</div>
+              {top10Depts.length > 0 && (
+                <span className="mono text-[9px] text-dim" title="Source of each department's allocation figure">
+                  {sourceMix(top10Depts)}
+                </span>
+              )}
+            </div>
             {deptLoading ? (
               <div className="h-64 flex items-center justify-center mono text-[10px] text-dim">Loading...</div>
+            ) : top10Depts.length === 0 ? (
+              <div className="h-64 flex items-center justify-center mono text-[10px] text-dim">
+                No department figures for FY {financialYear} in this view
+              </div>
             ) : (
               <ResponsiveContainer width="100%" height={260}>
                 <BarChart data={top10Depts.map(d => ({
                   name: d.code,
-                  Allocated: d.budget_estimate_lakhs,
-                  Utilized: d.utilized_lakhs ?? 0,
+                  [series.alloc]: d.budget_estimate_lakhs,
+                  [series.util]: d.utilized_lakhs,
                 }))} barGap={2}>
                   <XAxis dataKey="name" tick={{ fill: '#5a7a9a', fontSize: 9, fontFamily: 'Space Mono' }} />
                   <YAxis tick={{ fill: '#5a7a9a', fontSize: 9, fontFamily: 'Space Mono' }}
                     tickFormatter={v => `₹${(v/100).toFixed(0)}Cr`} />
                   <Tooltip content={<CustomTooltip />} />
-                  <Bar dataKey="Allocated" fill="rgba(0,170,255,0.3)"  stroke="#00aaff" strokeWidth={1} />
-                  <Bar dataKey="Utilized"  fill="rgba(0,255,136,0.35)" stroke="#00ff88" strokeWidth={1} />
+                  <Bar dataKey={series.alloc} fill="rgba(0,170,255,0.3)"  stroke="#00aaff" strokeWidth={1} />
+                  <Bar dataKey={series.util}  fill="rgba(0,255,136,0.35)" stroke="#00ff88" strokeWidth={1} />
                 </BarChart>
               </ResponsiveContainer>
             )}
@@ -145,8 +184,15 @@ export default function Overview() {
 
           {/* Capital vs Revenue Pie */}
           <div className="panel">
-            <div className="panel-title">BUDGET COMPOSITION</div>
-            {overview ? (
+            <div className="flex items-center justify-between gap-2">
+              <div className="panel-title">BUDGET COMPOSITION</div>
+              {overview && <SourceBadge source={overview.sources.total_capital_lakhs} />}
+            </div>
+            {overview && pieData.length === 0 ? (
+              <div className="h-64 flex items-center justify-center mono text-[10px] text-dim">
+                No capital / revenue split for FY {financialYear} in this view
+              </div>
+            ) : overview ? (
               <ResponsiveContainer width="100%" height={260}>
                 <PieChart>
                   <Pie data={pieData} cx="50%" cy="45%" innerRadius={55} outerRadius={85}
@@ -176,7 +222,7 @@ export default function Overview() {
               <table className="w-full">
                 <thead>
                   <tr className="border-b" style={{ borderColor: '#1a2a3a' }}>
-                    {['DEPARTMENT', 'STATE RECEIPT', 'CENTRAL RELEASE', 'UTILIZED', 'PARKED GAP', 'UTILIZATION', 'STATUS'].map(h => (
+                    {['DEPARTMENT', 'ALLOCATED', 'CENTRAL RELEASE', 'UTILIZED', 'PARKED GAP', 'UTILIZATION', 'STATUS'].map(h => (
                       <th key={h} className="mono text-[8px] text-dim text-left pb-2 pr-4 tracking-widest">{h}</th>
                     ))}
                   </tr>
@@ -189,20 +235,27 @@ export default function Overview() {
                         <div className="mono text-[10px]">{g.department_name.split('(')[0].trim()}</div>
                         <div className="mono text-[8px] text-dim">{g.department_code}</div>
                       </td>
-                      <td className="mono text-[10px] pr-4 text-blue" title="Total Allocated to Department">
-                        {fmtLakhs(g.allocated_lakhs)}
+                      <td className="mono text-[10px] pr-4 text-blue">
+                        <div className="flex items-center gap-1.5">
+                          {fmtLakhs(g.allocated_lakhs)} <SourceBadge source={g.sources.allocated_lakhs} />
+                        </div>
                       </td>
-                      <td className="mono text-[10px] pr-4 text-purple" title="Central Funds Released (via PFMS)">
-                        {fmtLakhs(g.released_lakhs)}
+                      <td className="mono text-[10px] pr-4 text-purple">
+                        <div className="flex items-center gap-1.5">
+                          {fmtLakhs(g.released_lakhs)}
+                          {g.released_lakhs != null && <SourceBadge source={g.sources.released_lakhs} />}
+                        </div>
                       </td>
-                      <td className="mono text-[10px] pr-4 text-green" title="Actual Amount Utilized on Ground">
-                        {fmtLakhs(g.utilized_lakhs)}
+                      <td className="mono text-[10px] pr-4 text-green">
+                        <div className="flex items-center gap-1.5">
+                          {fmtLakhs(g.utilized_lakhs)} <SourceBadge source={g.sources.utilized_lakhs} />
+                        </div>
                       </td>
                       <td className="mono text-[10px] pr-4 text-red" title="Idle money parked (Central Release - Utilized)">
                         {fmtLakhs(g.gap_lakhs)}
                       </td>
                       <td className="pr-4" style={{ minWidth: 120 }}>
-                        <UtilBar allocated={g.released_lakhs > g.allocated_lakhs ? g.released_lakhs : g.allocated_lakhs} utilized={g.utilized_lakhs} showLabels={false} />
+                        <UtilBar allocated={Math.max(g.released_lakhs ?? 0, g.allocated_lakhs)} utilized={g.utilized_lakhs} showLabels={false} />
                         <div className={`mono text-[9px] mt-0.5 ${utilColor(g.utilization_pct)}`}>
                           {fmtPct(g.utilization_pct)}
                         </div>
@@ -211,9 +264,10 @@ export default function Overview() {
                         <span className={`mono text-[8px] px-2 py-0.5 rounded-sm ${
                           g.gap_flag === 'critical' ? 'text-red bg-red-900/20 border border-red-800/40' :
                           g.gap_flag === 'warning'  ? 'text-gold bg-yellow-900/20 border border-yellow-800/40' :
+                          g.gap_flag === 'no_data'  ? 'text-dim bg-slate-800/40 border border-slate-700/40' :
                           'text-green bg-green-900/20 border border-green-800/40'
                         }`}>
-                          {g.gap_flag.toUpperCase()}
+                          {g.gap_flag === 'no_data' ? 'NO DATA' : g.gap_flag.replace('_', ' ').toUpperCase()}
                         </span>
                       </td>
                     </tr>
@@ -223,9 +277,9 @@ export default function Overview() {
             </div>
             {gaps.length > 10 && (
               <div className="mt-3 flex justify-end">
-                <a href="/departments" className="mono text-[9px] text-blue hover:opacity-80 transition-opacity">
+                <Link to="/departments" className="mono text-[9px] text-blue hover:opacity-80 transition-opacity">
                   View all {gaps.length} departments →
-                </a>
+                </Link>
               </div>
             )}
           </div>
