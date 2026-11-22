@@ -14,3 +14,16 @@ Downloaded 2026-11-22.
 
 The parser gives the same result on the full original PDFs as on these cut-down fixtures
 (checked 2026-11-22).
+
+## Grant-page fixtures
+
+`jk-appropriation-<year>-grants.pdf` hold the grant pages ("GRANT NO. ..." onwards) of a few
+grants per year, cut the same way from the same original PDFs (SHA-256 above), on 2026-11-22.
+They have no summary pages; the tests take the summary from the `-summary.pdf` fixtures. The
+grants were picked for the layout quirks they show (see `parsers/appropriation_details.py`).
+
+| Fixture | PDF pages of original | Grants | Quirks covered |
+|---|---|---|---|
+| `jk-appropriation-2021-22-grants.pdf` | 28–33, 40–43, 59, 142–146, 158–160 | 2, 6, 9, 28, 34 | doubled bold glyphs, "Supplementary/ Re-appropriation", major-head name wrapped onto "Voted", non-head table (works establishment charges), withdrawn charged block, footnote in a table, missing "O" label, revenue head printed under "Capital Section" |
+| `jk-appropriation-2022-23-grants.pdf` | 30–35, 41–44, 149–152 | 2, 5, 6, 32, 33 | "R" amount on the line below its label, grant with no amounts (Mining), shifted page margin, printed arithmetic error (grant 32), note numbers skipping 6 |
+| `jk-appropriation-2023-24-grants.pdf` | 19–30, 117–119, 137–138, 147–148 | 1, 2, 24, 31, 36 | every note-table type, branch printed with no row, table printed without a header, "Capital Section" heading in the section block, block without a "Voted" label |

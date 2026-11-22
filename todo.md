@@ -168,6 +168,58 @@ Every figure carries its source label, e.g. "Official · Appropriation Accounts 
 - [ ] **Step 4: mismatch page.** List every Live-vs-Official difference above the threshold, next to the Alerts page.
 - [ ] Portals report by scheme and the PDFs by department grant, so Combined can only compare them at department level, through `grant_department_map`. Until scheme spending can be added up per grant, show scheme-level figures as Live only.
 
+### 2.2b How the money was used: grant detail pages
+Review on 2026-11-22: the dashboard shows only top-line numbers per grant (final grant, spent, revenue/capital). It can't answer "what was the money spent on?", "which schemes or offices left money unspent, and why?" or "was the original budget realistic?". Those answers are already in the Appropriation Accounts PDFs we download and store, but the parser reads only the ~5-page summary out of 158 pages (2023-24).
+
+What the rest of each PDF contains (checked 2026-11-22 in the 2023-24 PDF, https://cag.gov.in/uploads/state_accounts_report/account-report-Appropriation-2023-24-UT-JK-English-28-03-2025-069d791c2d23943-29281571.pdf; table of contents on PDF page 5):
+- **Grant pages** (printed pages 1–~132; printed p.1 = PDF page 19): for each grant, its major heads, then Original / Supplementary / Amount surrendered and the actual spending, saving or excess for each Revenue/Capital × Voted/Charged section, in ₹ thousand.
+- **Notes and Comments** (e.g. PDF page 20): one line for each head below that (major → minor → sub-head, e.g. `2052 → 090 → 0099 → 0431 Chief Minister's Secretariat`), with O (original), S (supplementary), R (re-appropriation), total grant, actual spending, saving/excess **and a written reason**, in ₹ **lakh**. Reasons look like "Less expenditure … mainly in respect of Salary, TE and nil expenditure in respect of LTC" or "Entire provision remained un-utilised throughout the year". The notes also say when no reason was given ("reasons for which were not communicated [July 2024]") and whether savings were surrendered ("No portion of final saving … has been anticipated and surrendered").
+- **Appendix I** (printed p.133): spending from Contingency Fund advances that had not been paid back by year end.
+- **Appendix II** (printed pp.135–137, PDF pages 153–155): **Budget Estimates vs actuals** and recoveries for each grant, Revenue and Capital, in ₹ thousand. This gives real Budget Estimates for past years (see 2.2).
+
+Layouts differ between years (see the parser docstring), so check the 2021-22 and 2022-23 PDFs before relying on page numbers or wording.
+
+- [x] **Parser:** `backend/parsers/appropriation_details.py` (CLI: `python -m parsers.appropriation_details <pdf> --format csv|json`). Done 2026-11-22. For each grant it returns:
+  - the major heads per section;
+  - each Voted/Charged section block (original, supplementary, re-appropriation, final grant, expenditure, saving/excess, surrendered);
+  - every numbered note (verbatim text, category, whether "reasons … were not communicated");
+  - one row per head in the note tables: head path with a level per code (major / sub-major / minor / sub-head / detailed) and names, O / S / R, total grant, actual, saving/excess, verbatim remark, PDF page.
+  
+  Note categories: `saving`, `excess`, `unutilised` (entire provision unspent), `unutilised_supplementary`, `without_provision` (spent with no budget), `comment` (no table).
+
+  **Units:** every amount is an integer in ₹ thousand, like the summary. The notes print ₹ lakh with two decimals, and 1 lakh = 100 thousand, so the conversion is exact.
+
+  **Totals:** 985 head rows (2021-22), 999 (2022-23) and 1,021 (2023-24). The layout quirks handled are listed in the module docstring and code comments, e.g. glued remarks, doubled bold glyphs, tables without headers, missing O labels, a revenue head printed under "Capital Section".
+- [x] **Checks:**
+  - Each section block must satisfy original + supplementary (+ re-appropriation) = final grant and final grant − expenditure = saving − excess, and must match its summary row.
+  - Each head row must satisfy O + S + R = total grant and total grant − actual = saving − excess.
+  - Each row's major head must be listed for its grant.
+  - Every saving / excess / unutilised / without-provision note must have rows.
+  - Any failure rejects the whole document.
+  
+  The notes list only selected heads, so they are not checked against the section totals. **Three rows in the PDFs don't add up as printed:** 2022-23 grant 18 head 1287, 2022-23 grant 32 head 0222, and 2023-24 grant 17 head 1544. They are listed in `KNOWN_PRINTED_ERRORS`, kept as printed and flagged with `printed_error`; a stale entry fails validation.
+- [x] **Fixtures + tests:** `tests/fixtures/appropriation_accounts/jk-appropriation-<year>-grants.pdf` (5 grants per year, page ranges and the quirk each grant covers in `SOURCES.md`) and `tests/test_appropriation_details.py`. Figures were read by hand from the PDFs. A full-document test also runs when the loader has saved the PDFs locally; it skips in CI.
+- [ ] **Storage + loader:** new tables for the parser's output (FK to `source_snapshots`): head rows, section blocks and notes. A head can appear in more than one note (e.g. an excess row and an unspent-supplementary row), so make a row unique on year + grant + section + kind + head path + note number. Load them in the same transaction as the summary in `loaders/appropriation_accounts.py`. Reloading the same file changes nothing. Keep `printed_error`, `skipped_tables`, `misfiled` and `footnotes` so they can be shown.
+- [ ] **Appendix II:** parse Budget Estimates vs actuals per grant into its own table (or as columns on the summary), and add the **Budget Estimate → final grant → spent** chain to the Official view. The current year's Budget Estimates still need the J&K budget documents (see 2.2).
+- [ ] **API:** `GET /api/v1/budget/departments/{id}/breakdown?financial_year=` (and the same per unmapped grant number, see the open point in 2.2a step 2) returns the head tree with amounts, remark, page and snapshot link. Every figure carries a `FigureSource` like the other official figures.
+- [ ] **Department page breakdown:** a table or treemap of where the grant went (major head → sub-head), "biggest unspent items" with the official reason quoted, and a link to the PDF page for each row.
+- [ ] **Accountability flags** (computed at query time from the stored rows, not invented):
+  - heads where the entire provision went unspent (`fully_unutilised`)
+  - savings that were not surrendered
+  - supplementary grants that weren't needed (final saving ≥ the supplementary amount)
+  - share of a department's large variations where "reasons were not communicated"
+  - excess spending over the grant (needs regularisation by the legislature)
+
+  Show them on the department page and add them to the Alerts page, each linked to its PDF page.
+- [ ] **Multi-year trends:** a 2021-22 → 2023-24 (and later years from 2.2) chart for each department and for each major head, using only official figures. Label clearly that these are audited annual accounts and the latest year is 2023-24, not current spending.
+- [ ] **Later, other documents** (not yet checked; record a source URL before relying on any of them):
+  - Finance Accounts Vol I/II for the same years, possibly for spending by object head (salaries, works, grants-in-aid) and capital works; content not yet checked.
+  - The J&K budget documents for the current year (see 2.2).
+  - CAG audit reports for what went wrong (see 2.3).
+- [ ] District- and scheme-level breakdowns wait for real sources (2.1, 2.4). Don't add detail on top of simulated data.
+
+**Done when:** for every loaded year, each mapped and unmapped grant has a breakdown page listing its heads with amounts, the verbatim official reason and a link to the PDF page; the head totals match the summary rows; parser tests pass on fixtures from all 3 saved PDFs; and the Overview/department pages show Budget Estimate → final grant → spent for past years from Appendix II.
+
 ### 2.3 CAG findings from real reports
 - [ ] Download the real J&K audit reports, split them into paragraphs, and keep the page numbers.
 - [ ] Use LLM extraction (Claude or Gemini) with a strict JSON schema. Store the **verbatim source paragraph + page number** next to the summary. Set the model in config, not hardcoded (`gemini-2.0-flash` is in `cag_collector.py` today).
@@ -295,6 +347,7 @@ A transparency tool earns a 9 only if citizens can actually reach it.
 |---|---|---|---|
 | Runs from a fresh clone | ✗ (frontend broken) | ✓ | 0 |
 | Data is real and traceable | ✗ (6/8 collectors produce random data, no provenance columns) | ✓ | 1, 2 |
+| Shows how money was used, not just totals | ✗ (grant totals only) | ✓ (head-level breakdown, official reasons, BE → grant → spent) | 2.2b |
 | Honest status and freshness | ✗ | ✓ | 1 |
 | Migrations / security / reliability | ✗ | ✓ | 3 |
 | Publicly deployed with backups | ✗ | ✓ | 3.4 |
