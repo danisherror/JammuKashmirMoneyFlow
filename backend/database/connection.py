@@ -15,7 +15,7 @@ async_engine = create_async_engine(
     pool_size=10,
     max_overflow=20,
     pool_pre_ping=True,           # test connection before using from pool
-    echo=(settings.app_env == "development"),
+    echo=settings.sql_echo,
 )
 
 AsyncSessionLocal = async_sessionmaker(
@@ -30,6 +30,7 @@ sync_engine = create_engine(
     pool_size=5,
     max_overflow=10,
     pool_pre_ping=True,
+    echo=settings.sql_echo,
 )
 
 SyncSessionLocal = sessionmaker(bind=sync_engine, autoflush=False, autocommit=False)

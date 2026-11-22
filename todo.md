@@ -22,14 +22,14 @@ Work through the phases in order. Each phase lists the score it should unlock. A
 - [ ] Verify the marker coordinates in `frontend/src/lib/districtCoordinates.ts` against an official gazetteer and add the source URL (currently approximate, unsourced).
 - [ ] Better long-term: generate the TS types from `/openapi.json` (e.g. `openapi-typescript`) so the frontend and backend can't drift apart.
 
-**Done when:** `git clone` → `cp .env.example .env` → `docker-compose up --build` renders every route in the browser with no Vite overlay, and `npm run build` (which runs `tsc`) exits 0. That currently means fixing 72 type errors.
+**Done when:** `git clone` → `cp .env.example .env` → `docker-compose up --build` renders every route in the browser with no Vite overlay, and `npm run build` (which runs `tsc`) exits 0. ✅ Checked 2026-11-22: all 12 routes render from a fresh clone with no overlay or console errors; `npm run build` exits 0.
 
 ### 0.2 Clean dev ergonomics
-- [ ] Remove the obsolete `version:` key from `docker-compose.yml`.
-- [ ] Turn off SQLAlchemy `echo` by default (`backend/database/connection.py:18`) and add a separate `SQL_ECHO` env var.
-- [ ] Pin frontend dependency versions exactly (keep `package-lock.json` authoritative) and use `npm ci` in `frontend/Dockerfile`.
+- [x] Remove the obsolete `version:` key from `docker-compose.yml`.
+- [x] Turn off SQLAlchemy `echo` by default (`backend/database/connection.py:18`) and add a separate `SQL_ECHO` env var.
+- [x] Pin frontend dependency versions exactly (keep `package-lock.json` authoritative) and use `npm ci` in `frontend/Dockerfile`.
 
-**Done when:** `docker-compose up` prints no `version` warning, the API log has no SQL statements unless `SQL_ECHO=true`, and `frontend/Dockerfile` uses `npm ci`.
+**Done when:** `docker-compose up` prints no `version` warning, the API log has no SQL statements unless `SQL_ECHO=true`, and `frontend/Dockerfile` uses `npm ci`. ✅ Checked 2026-11-22.
 
 ### 0.3 Minimal CI from day one
 Phases 1–3 are heavy refactors. Without CI, regressions go unnoticed until Phase 4.

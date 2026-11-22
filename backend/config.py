@@ -7,6 +7,7 @@ class Settings(BaseSettings):
     app_env: str = "development"
     secret_key: str = "dev-secret-key"
     log_level: str = "INFO"
+    sql_echo: bool = False            # log every SQL statement (noisy; for debugging)
 
     # Database
     database_url: str = "postgresql+asyncpg://postgres:password@localhost:5432/jk_money_flow"
