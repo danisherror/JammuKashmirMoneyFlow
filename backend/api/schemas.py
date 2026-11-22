@@ -2,10 +2,12 @@
 Pydantic schemas for all API request/response models.
 These define exactly what the frontend receives from every endpoint.
 """
-from pydantic import BaseModel
-from typing import Optional
+from pydantic import BaseModel, Field
+from typing import Literal, Optional
 from datetime import date, datetime
 from enum import Enum
+
+from processors.combined_view import View as ViewEnum  # noqa: F401  (re-exported for routes)
 
 
 # ── Shared ────────────────────────────────────────────────────────────────────
@@ -22,33 +24,65 @@ class SchemeTypeEnum(str, Enum):
     UT = "ut"
 
 
+# ── Provenance (todo.md 2.2a) ─────────────────────────────────────────────────
+
+class MismatchInfo(BaseModel):
+    """Set in the combined view when the portal and the audited accounts differ by more than 2%."""
+    live: float = Field(description="Live (portal / budget table) figure, ₹ lakhs")
+    official: float = Field(description="Official (CAG accounts) figure, ₹ lakhs")
+    diff_pct: Optional[float] = Field(description="(live − official) / official × 100; null when official is 0")
+
+
+class FigureSource(BaseModel):
+    """Where one figure in the response comes from. Keyed by the figure's field name in `sources`."""
+    source_type: Optional[Literal["live", "official"]] = Field(description="null when there is no data")
+    label: str = Field(description='e.g. "Official · Appropriation Accounts 2022-23, p.4"')
+    measure: Optional[str] = Field(
+        None,
+        description="What the number is: budget_estimate, revised_estimate, final_grant (original + "
+                    "supplementary), gross_expenditure, utilized, released, allocated",
+    )
+    source_url: Optional[str] = None
+    snapshot_id: Optional[int] = Field(None, description="source_snapshots.id of the saved document")
+    page: Optional[int] = Field(None, description="First page of the figure in the snapshot PDF")
+    fetched_at: Optional[datetime] = None
+    provisional: bool = False
+    mismatch: Optional[MismatchInfo] = None
+
+
+class Sourced(BaseModel):
+    """Mixin: which view produced the response, and a FigureSource per figure field."""
+    view: ViewEnum = ViewEnum.COMBINED
+    sources: dict[str, FigureSource] = {}
+
+
 # ── Budget ────────────────────────────────────────────────────────────────────
 
-class BudgetOverview(BaseModel):
+class BudgetOverview(Sourced):
     financial_year: str
-    total_budget_lakhs: int
-    total_capital_lakhs: int
-    total_revenue_lakhs: int
-    capital_pct: float
-    revenue_pct: float
-    total_departments: int
+    total_budget_lakhs: Optional[float]
+    total_capital_lakhs: Optional[float]
+    total_revenue_lakhs: Optional[float]
+    capital_pct: Optional[float]
+    revenue_pct: Optional[float]
+    total_departments: int                     # official view: number of grants
     data_as_of: Optional[date]
 
     class Config:
         from_attributes = True
 
 
-class DepartmentSummary(BaseModel):
+class DepartmentSummary(Sourced):
     id: int
     name: str
     code: str
     division: DivisionEnum
     financial_year: str
-    budget_estimate_lakhs: int
-    revised_estimate_lakhs: Optional[int]
-    utilized_lakhs: Optional[int]
+    budget_estimate_lakhs: Optional[float]     # official: final grant — see sources[...].measure
+    revised_estimate_lakhs: Optional[float]
+    utilized_lakhs: Optional[float]            # official: gross expenditure
     utilization_pct: Optional[float]
-    is_capital: bool
+    is_capital: Optional[bool]                 # null for official figures (revenue + capital)
     data_as_of: Optional[date]
 
     class Config:
@@ -61,21 +95,21 @@ class DepartmentDetail(DepartmentSummary):
     year_over_year: Optional[dict] = None      # {current: X, previous: Y, change_pct: Z}
 
 
-class GapAnalysisItem(BaseModel):
+class GapAnalysisItem(Sourced):
     department_id: int
     department_name: str
     department_code: str
-    allocated_lakhs: int
-    released_lakhs: int
-    utilized_lakhs: int
-    gap_lakhs: int
-    utilization_pct: float
-    gap_flag: str                              # "critical" | "warning" | "on_track"
+    allocated_lakhs: float
+    released_lakhs: Optional[float]            # null when no PFMS release figure exists
+    utilized_lakhs: Optional[float]
+    gap_lakhs: Optional[float]
+    utilization_pct: Optional[float]
+    gap_flag: str                              # "critical" | "warning" | "on_track" | "no_data"
 
 
 # ── Schemes ───────────────────────────────────────────────────────────────────
 
-class SchemeSummary(BaseModel):
+class SchemeSummary(Sourced):
     id: int
     name: str
     code: str
@@ -134,7 +168,7 @@ class SchemeHistoryPoint(BaseModel):
         from_attributes = True
 
 
-class SchemeVelocity(BaseModel):
+class SchemeVelocity(Sourced):
     """Full velocity + projection payload for a scheme."""
     scheme_id: int
     scheme_name: str

@@ -3,6 +3,10 @@ Scheme routes — MGNREGA, JJM, PMAY, etc.
 GET /api/v1/schemes
 GET /api/v1/schemes/{id}
 GET /api/v1/schemes/{id}/history
+
+Every route takes `?view=live|official|combined`. Scheme figures are live only: the CAG accounts are
+by department grant, so there is no official figure per scheme yet (todo.md 2.2a). The official view
+therefore returns no figures, and the combined view returns the live ones marked provisional.
 """
 from fastapi import APIRouter, Depends, Query, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -11,9 +15,44 @@ from datetime import date
 
 from database.connection import get_db
 from database.models import Scheme, SchemeProgress, District, Department
-from api.schemas import SchemeSummary, SchemeDetail, SchemeDistrictProgress, SchemeHistoryPoint, SchemeVelocity
+from api.figures import live_label, to_source
+from api.schemas import (
+    FigureSource, SchemeSummary, SchemeDetail, SchemeDistrictProgress, SchemeHistoryPoint, SchemeVelocity,
+)
+from processors.combined_view import Figure, View, resolve
 
 router = APIRouter(prefix="/schemes", tags=["Schemes"])
+
+VIEW_QUERY = Query(View.COMBINED, description="live | official | combined (default)")
+OFFICIAL_NOTE = "No official figure per scheme: the CAG accounts are by department grant"
+OUTLAY_SOURCE = FigureSource(
+    source_type=None,
+    label="Reference value from database/seeds.py; no source document recorded yet",
+    measure="total_outlay",
+)
+
+
+def scheme_sources(
+    view: View,
+    financial_year: str,
+    scheme: Scheme,
+    values: dict[str, tuple[float | None, str]],
+    source: str | None,
+    updated,
+) -> tuple[dict[str, float | None], dict[str, FigureSource]]:
+    """Resolve each live scheme figure ({field: (value, measure)}) for `view`; returns values + sources."""
+    out_values: dict[str, float | None] = {}
+    out_sources: dict[str, FigureSource] = {"total_outlay_lakhs": OUTLAY_SOURCE}
+    for name, (value, measure) in values.items():
+        live = Figure(
+            value=value, source_type="live", label=live_label({source}), measure=measure,
+            source_url=scheme.source_url, fetched_at=updated,
+        ) if value is not None else None
+        note = OFFICIAL_NOTE if view is View.OFFICIAL else f"No data collected for {financial_year}"
+        resolved = resolve(view, live, None, note=note)
+        out_values[name] = resolved.value
+        out_sources[name] = to_source(resolved)
+    return out_values, out_sources
 
 
 @router.get("", response_model=list[SchemeSummary])
@@ -21,9 +60,10 @@ async def list_schemes(
     financial_year: str = Query("2024-25"),
     scheme_type: str | None = Query(None, description="css | central | ut"),
     department_id: int | None = Query(None),
+    view: View = VIEW_QUERY,
     db: AsyncSession = Depends(get_db),
 ):
-    """All schemes with their aggregate financial progress. Fixed: was N+1; now 2 queries total."""
+    """All schemes with their aggregate financial progress (2 queries)."""
     query = select(Scheme, Department).join(Department)
     if scheme_type:
         query = query.where(Scheme.scheme_type == scheme_type)
@@ -42,6 +82,8 @@ async def list_schemes(
             func.sum(SchemeProgress.funds_released).label("released"),
             func.avg(SchemeProgress.physical_pct).label("avg_physical"),
             func.max(SchemeProgress.snapshot_date).label("latest_date"),
+            func.max(SchemeProgress.source).label("source"),
+            func.max(SchemeProgress.created_at).label("updated"),
         ).where(
             SchemeProgress.financial_year == financial_year,
         ).group_by(SchemeProgress.scheme_id)
@@ -51,10 +93,14 @@ async def list_schemes(
     results = []
     for scheme, dept in rows:
         row = agg_map.get(scheme.id)
-        allocated = int(row.allocated or 0) if row else 0
-        utilized = int(row.utilized or 0) if row else 0
-        released = int(row.released or 0) if row else 0
-        util_pct = round((utilized / allocated * 100), 2) if allocated > 0 else None
+        values, sources = scheme_sources(view, financial_year, scheme, {
+            "funds_allocated_lakhs": (to_int(row.allocated) if row else None, "allocated"),
+            "funds_released_lakhs": (to_int(row.released) if row else None, "released"),
+            "funds_utilized_lakhs": (to_int(row.utilized) if row else None, "utilized"),
+            "physical_pct": (round(row.avg_physical, 2) if row and row.avg_physical is not None else None,
+                             "physical_progress_pct"),
+        }, row.source if row else None, row.updated if row else None)
+        allocated, utilized = values["funds_allocated_lakhs"], values["funds_utilized_lakhs"]
 
         results.append(SchemeSummary(
             id=scheme.id,
@@ -64,11 +110,13 @@ async def list_schemes(
             department_name=dept.name,
             total_outlay_lakhs=scheme.total_outlay,
             funds_allocated_lakhs=allocated,
-            funds_released_lakhs=released if released > 0 else None,
+            funds_released_lakhs=values["funds_released_lakhs"],
             funds_utilized_lakhs=utilized,
-            utilization_pct=util_pct,
-            physical_pct=round(row.avg_physical, 2) if row and row.avg_physical else None,
-            last_updated=row.latest_date if row else None,
+            utilization_pct=round(utilized / allocated * 100, 2) if allocated and utilized is not None else None,
+            physical_pct=values["physical_pct"],
+            last_updated=row.latest_date if row and view is not View.OFFICIAL else None,
+            view=view,
+            sources=sources,
         ))
 
     results.sort(key=lambda x: x.total_outlay_lakhs or 0, reverse=True)
@@ -79,6 +127,7 @@ async def list_schemes(
 async def get_scheme_detail(
     scheme_id: int,
     financial_year: str = Query("2024-25"),
+    view: View = VIEW_QUERY,
     db: AsyncSession = Depends(get_db),
 ):
     """Full scheme detail with district-wise breakdown."""
@@ -100,10 +149,10 @@ async def get_scheme_detail(
             SchemeProgress.financial_year == financial_year,
         )
     )
-    latest_date = latest_date_result.scalar()
+    latest_date = latest_date_result.scalar() if view is not View.OFFICIAL else None
 
-    # District-wise progress for latest snapshot
-    district_rows = (await db.execute(
+    # District-wise progress for latest snapshot (live only; none in the official view)
+    district_rows = [] if latest_date is None else (await db.execute(
         select(SchemeProgress, District)
         .join(District, SchemeProgress.district_id == District.id)
         .where(
@@ -134,13 +183,24 @@ async def get_scheme_detail(
         for sp, district in district_rows
     ]
 
-    total_allocated = sum(d.funds_allocated_lakhs or 0 for d in district_progress)
-    total_utilized = sum(d.funds_utilized_lakhs or 0 for d in district_progress)
-    total_released = sum(d.funds_released_lakhs or 0 for d in district_progress)
-    avg_physical = (
-        sum(d.physical_pct or 0 for d in district_progress) / len(district_progress)
-        if district_progress else None
+    def total(attr: str) -> int | None:
+        known = [getattr(d, attr) for d in district_progress if getattr(d, attr) is not None]
+        return sum(known) if known else None
+
+    physical = [d.physical_pct for d in district_progress if d.physical_pct is not None]
+    snapshots = [sp for sp, _ in district_rows]
+    values, sources = scheme_sources(view, financial_year, scheme, {
+        "funds_allocated_lakhs": (total("funds_allocated_lakhs"), "allocated"),
+        "funds_released_lakhs": (total("funds_released_lakhs"), "released"),
+        "funds_utilized_lakhs": (total("funds_utilized_lakhs"), "utilized"),
+        "physical_pct": (round(sum(physical) / len(physical), 2) if physical else None, "physical_progress_pct"),
+    },
+        max((sp.source for sp in snapshots if sp.source), default=None),
+        max((sp.created_at for sp in snapshots if sp.created_at), default=None),
     )
+    if district_progress:
+        sources["district_progress"] = sources["funds_utilized_lakhs"]
+    allocated, utilized = values["funds_allocated_lakhs"], values["funds_utilized_lakhs"]
 
     return SchemeDetail(
         id=scheme.id,
@@ -149,12 +209,14 @@ async def get_scheme_detail(
         scheme_type=scheme.scheme_type,
         department_name=dept.name,
         total_outlay_lakhs=scheme.total_outlay,
-        funds_allocated_lakhs=total_allocated,
-        funds_released_lakhs=total_released if total_released > 0 else None,
-        funds_utilized_lakhs=total_utilized,
-        utilization_pct=round((total_utilized / total_allocated * 100), 2) if total_allocated else None,
-        physical_pct=round(avg_physical, 2) if avg_physical else None,
+        funds_allocated_lakhs=allocated,
+        funds_released_lakhs=values["funds_released_lakhs"],
+        funds_utilized_lakhs=utilized,
+        utilization_pct=round(utilized / allocated * 100, 2) if allocated and utilized is not None else None,
+        physical_pct=values["physical_pct"],
         last_updated=latest_date,
+        view=view,
+        sources=sources,
         description=scheme.description,
         start_year=scheme.start_year,
         end_year=scheme.end_year,
@@ -167,6 +229,7 @@ async def get_scheme_detail(
 async def get_scheme_velocity(
     scheme_id: int,
     financial_year: str = Query("2024-25"),
+    view: View = VIEW_QUERY,
     db: AsyncSession = Depends(get_db),
 ):
     """
@@ -183,12 +246,14 @@ async def get_scheme_velocity(
     if not scheme:
         raise HTTPException(status_code=404, detail="Scheme not found")
 
-    # Pull all snapshots aggregated by date (sum across districts)
-    rows = (await db.execute(
+    # Pull all snapshots aggregated by date (sum across districts); live only
+    rows = [] if view is View.OFFICIAL else (await db.execute(
         select(
             SchemeProgress.snapshot_date,
             func.sum(SchemeProgress.funds_allocated).label("allocated"),
             func.sum(SchemeProgress.funds_utilized).label("utilized"),
+            func.max(SchemeProgress.source).label("source"),
+            func.max(SchemeProgress.created_at).label("updated"),
         )
         .where(
             SchemeProgress.scheme_id == scheme_id,
@@ -208,6 +273,21 @@ async def get_scheme_velocity(
         )
         for r in rows
     ]
+
+    if rows:
+        history_source = FigureSource(
+            source_type="live",
+            label=f"{live_label({r.source for r in rows})} (provisional)",
+            measure="utilized",
+            source_url=scheme.source_url,
+            fetched_at=max((r.updated for r in rows if r.updated), default=None),
+            provisional=True,
+        )
+    else:
+        history_source = FigureSource(
+            source_type=None,
+            label=OFFICIAL_NOTE if view is View.OFFICIAL else f"No data collected for {financial_year}",
+        )
 
     # ── Projection math ────────────────────────────────────────────────────────
     fy_start_year = int(financial_year.split("-")[0])
@@ -259,4 +339,10 @@ async def get_scheme_velocity(
         on_track=on_track,
         surrender_risk_lakhs=surrender_risk,
         verdict=verdict,
+        view=view,
+        sources={"history": history_source},
     )
+
+
+def to_int(value) -> int | None:
+    return int(value) if value is not None else None

@@ -34,8 +34,8 @@ export default function Layout() {
     const checkAndSyncData = async () => {
       try {
         const overview = await fetchBudgetOverview(financialYear)
-        // If total budget is 0, we assume the data hasn't been scraped yet for this year
-        if (mounted && overview && overview.total_budget_lakhs === 0) {
+        // No total (null) means no data for this year yet
+        if (mounted && overview && (overview.total_budget_lakhs == null || overview.total_budget_lakhs === 0)) {
           setIsSyncing(true)
           toast.loading(`Data for ${financialYear} missing. Starting background sync...`, { id: 'sync-toast' })
           

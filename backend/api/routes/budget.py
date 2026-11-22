@@ -4,50 +4,99 @@ GET /api/v1/budget/overview
 GET /api/v1/budget/departments
 GET /api/v1/budget/departments/{id}
 GET /api/v1/budget/gap-analysis
-"""
-from fastapi import APIRouter, Depends, Query
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func, and_
 
+Every route takes `?view=live|official|combined` (default combined; see processors.combined_view)
+and returns a `sources` map saying where each figure comes from. Official figures are the CAG
+Appropriation Accounts: "budget" is the final grant (original + supplementary) and "utilized" is
+gross expenditure, as stated in each source's `measure`.
+"""
+from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy import func, select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from api.figures import (
+    as_of,
+    department_figures,
+    live_label,
+    load_live_allocations,
+    load_official_year,
+    pct,
+    to_source,
+)
+from api.schemas import (
+    BudgetOverview,
+    DepartmentDetail,
+    DepartmentSummary,
+    FigureSource,
+    GapAnalysisItem,
+)
 from database.connection import get_db
-from database.models import Department, BudgetAllocation, Expenditure
-from api.schemas import BudgetOverview, DepartmentSummary, DepartmentDetail, GapAnalysisItem
+from database.models import Department, Expenditure, Scheme, SchemeProgress
+from processors.combined_view import Figure, View, resolve
 
 router = APIRouter(prefix="/budget", tags=["Budget"])
+
+VIEW_QUERY = Query(View.COMBINED, description="live | official | combined (default)")
 
 
 @router.get("/overview", response_model=BudgetOverview)
 async def get_budget_overview(
     financial_year: str = Query("2024-25", description="Financial year e.g. 2024-25"),
+    view: View = VIEW_QUERY,
     db: AsyncSession = Depends(get_db),
 ):
     """
-    Top-level J&K budget summary for the given financial year.
-    Returns total allocation, capital vs revenue split.
+    Top-level J&K budget summary for the given financial year: total, capital and revenue.
+    Live and official totals are never compared here: the budget table lists only some departments,
+    the CAG accounts all grants.
     """
-    result = await db.execute(
-        select(
-            func.sum(BudgetAllocation.budget_estimate).label("total"),
-            func.sum(BudgetAllocation.budget_estimate).filter(BudgetAllocation.is_capital.is_(True)).label("capital"),
-            func.sum(BudgetAllocation.budget_estimate).filter(BudgetAllocation.is_capital.is_(False)).label("revenue"),
-            func.count(BudgetAllocation.department_id.distinct()).label("dept_count"),
-        ).where(BudgetAllocation.financial_year == financial_year)
-    )
-    row = result.one()
+    live = await load_live_allocations(db, financial_year)
+    official = (await load_official_year(db, financial_year)).total
 
-    total = row.total or 0
-    capital = row.capital or 0
-    revenue = row.revenue or 0
+    def live_total(attr: str, measure: str) -> Figure | None:
+        if not live:
+            return None
+        return Figure(
+            value=float(sum(getattr(a, attr) for a in live.values())),
+            source_type="live",
+            label=live_label(set().union(*(a.sources for a in live.values()))),
+            measure=measure,
+            fetched_at=max((a.updated for a in live.values() if a.updated), default=None),
+        )
+
+    note = f"No budget figure for {financial_year}"
+    total = resolve(view, live_total("budget_estimate", "budget_estimate"),
+                    official.figure(official.final_grant, "final_grant") if official else None,
+                    comparable=False, note=note)
+    capital = resolve(view, live_total("capital", "budget_estimate"),
+                      official.figure(official.capital_final_grant, "final_grant") if official else None,
+                      comparable=False, note=note)
+    revenue = resolve(view, live_total("revenue", "budget_estimate"),
+                      official.figure(official.revenue_final_grant, "final_grant") if official else None,
+                      comparable=False, note=note)
+
+    if total.figure is None:
+        departments = 0
+    elif total.figure.source_type == "official":
+        departments = len(official.grants)
+    else:
+        departments = len(live)
 
     return BudgetOverview(
         financial_year=financial_year,
-        total_budget_lakhs=total,
-        total_capital_lakhs=capital,
-        total_revenue_lakhs=revenue,
-        capital_pct=round((capital / total * 100) if total > 0 else 0, 1),
-        revenue_pct=round((revenue / total * 100) if total > 0 else 0, 1),
-        total_departments=row.dept_count or 0,
-        data_as_of=None,
+        total_budget_lakhs=total.value,
+        total_capital_lakhs=capital.value,
+        total_revenue_lakhs=revenue.value,
+        capital_pct=pct(capital.value, total.value),
+        revenue_pct=pct(revenue.value, total.value),
+        total_departments=departments,
+        data_as_of=as_of(total, capital, revenue),
+        view=view,
+        sources={
+            "total_budget_lakhs": to_source(total),
+            "total_capital_lakhs": to_source(capital),
+            "total_revenue_lakhs": to_source(revenue),
+        },
     )
 
 
@@ -56,113 +105,93 @@ async def list_departments(
     financial_year: str = Query("2024-25"),
     division: str | None = Query(None, description="Filter by division: jammu/kashmir/central"),
     sort_by: str = Query("budget_estimate", description="Sort by: budget_estimate | utilization_pct"),
+    view: View = VIEW_QUERY,
     db: AsyncSession = Depends(get_db),
 ):
     """
-    All departments with their budget allocation and utilization for the year.
-    Fixed: was N+1 queries; now uses 2 batch queries total.
+    Departments with an allocation or spending figure for the year in the chosen view.
+    Official view: only the grants mapped to a tracker department (grant_department_map).
     """
-    query = (
-        select(Department, BudgetAllocation)
-        .join(BudgetAllocation, and_(
-            BudgetAllocation.department_id == Department.id,
-            BudgetAllocation.financial_year == financial_year,
-        ))
-        .where(Department.is_active.is_(True))
-    )
+    figures = await department_figures(db, financial_year, view)
+    if not figures:
+        return []
 
+    query = select(Department).where(Department.id.in_(list(figures)), Department.is_active.is_(True))
     if division:
         query = query.where(Department.division == division)
+    departments = (await db.execute(query)).scalars().all()
 
-    rows = (await db.execute(query)).all()
-
-    # ── Batch fetch all expenditure sums in ONE query (fix N+1) ──────────────
-    exp_rows = (await db.execute(
-        select(
-            Expenditure.department_id,
-            func.sum(Expenditure.utilized_amount).label("total"),
-        )
-        .where(Expenditure.financial_year == financial_year)
-        .group_by(Expenditure.department_id)
-    )).all()
-    exp_map = {row.department_id: (row.total or 0) for row in exp_rows}
-
-    results = []
-    for dept, alloc in rows:
-        utilized = exp_map.get(dept.id, 0)
-        budget = alloc.budget_estimate or 0
-        util_pct = round((utilized / budget * 100), 2) if budget > 0 else None
-
-        results.append(DepartmentSummary(
-            id=dept.id,
-            name=dept.name,
-            code=dept.code,
-            division=dept.division,
-            financial_year=financial_year,
-            budget_estimate_lakhs=alloc.budget_estimate,
-            revised_estimate_lakhs=alloc.revised_estimate,
-            utilized_lakhs=utilized,
-            utilization_pct=util_pct,
-            is_capital=alloc.is_capital,
-            data_as_of=None,
-        ))
-
+    results = [summary(dept, financial_year, view, figures[dept.id]) for dept in departments]
     if sort_by == "utilization_pct":
-        results.sort(key=lambda x: x.utilization_pct or 0, reverse=True)
+        results.sort(key=lambda x: (x.utilization_pct is not None, x.utilization_pct or 0), reverse=True)
     else:
-        results.sort(key=lambda x: x.budget_estimate_lakhs, reverse=True)
-
+        results.sort(key=lambda x: (x.budget_estimate_lakhs is not None, x.budget_estimate_lakhs or 0), reverse=True)
     return results
+
+
+def summary(dept: Department, financial_year: str, view: View, fig) -> DepartmentSummary:
+    return DepartmentSummary(
+        id=dept.id,
+        name=dept.name,
+        code=dept.code,
+        division=dept.division,
+        financial_year=financial_year,
+        budget_estimate_lakhs=fig.allocated.value,
+        revised_estimate_lakhs=fig.revised.value,
+        utilized_lakhs=fig.utilized.value,
+        utilization_pct=fig.utilization_pct,
+        is_capital=fig.is_capital,
+        data_as_of=as_of(fig.allocated, fig.utilized),
+        view=view,
+        sources=fig.sources(),
+    )
 
 
 @router.get("/departments/{dept_id}", response_model=DepartmentDetail)
 async def get_department_detail(
     dept_id: int,
     financial_year: str = Query("2024-25"),
+    view: View = VIEW_QUERY,
     db: AsyncSession = Depends(get_db),
 ):
-    """
-    Single department deep dive: monthly expenditure trend + linked schemes.
-    """
+    """Single department: totals in the chosen view, plus the live monthly expenditure trend."""
     dept = await db.get(Department, dept_id)
     if not dept:
-        from fastapi import HTTPException
         raise HTTPException(status_code=404, detail="Department not found")
 
-    alloc_result = await db.execute(
-        select(BudgetAllocation).where(
-            BudgetAllocation.department_id == dept_id,
-            BudgetAllocation.financial_year == financial_year,
-        )
-    )
-    alloc = alloc_result.scalar_one_or_none()
+    fig = (await department_figures(db, financial_year, view, [dept_id]))[dept_id]
+    base = summary(dept, financial_year, view, fig)
 
-    monthly_result = await db.execute(
-        select(Expenditure.month, func.sum(Expenditure.utilized_amount).label("amount"))
-        .where(
-            Expenditure.department_id == dept_id,
-            Expenditure.financial_year == financial_year,
-        )
-        .group_by(Expenditure.month)
-        .order_by(Expenditure.month)
-    )
-    monthly = [{"month": row.month, "amount_lakhs": row.amount or 0} for row in monthly_result]
-
-    total_utilized = sum(m["amount_lakhs"] for m in monthly)
-    budget = alloc.budget_estimate if alloc else 0
+    # Monthly figures exist only on the live side; the CAG accounts are annual.
+    monthly: list[dict] = []
+    monthly_source = FigureSource(source_type=None, label="The CAG accounts have no monthly figures")
+    if view is not View.OFFICIAL:
+        rows = (await db.execute(
+            select(
+                Expenditure.month,
+                func.sum(Expenditure.utilized_amount).label("amount"),
+                func.max(Expenditure.source).label("source"),
+                func.max(Expenditure.created_at).label("updated"),
+            )
+            .where(Expenditure.department_id == dept_id, Expenditure.financial_year == financial_year)
+            .group_by(Expenditure.month)
+            .order_by(Expenditure.month)
+        )).all()
+        monthly = [{"month": r.month, "amount_lakhs": r.amount} for r in rows]
+        if rows:
+            monthly_source = FigureSource(
+                source_type="live",
+                label=f"{live_label({r.source for r in rows})} (provisional)",
+                measure="utilized",
+                fetched_at=max((r.updated for r in rows if r.updated), default=None),
+                provisional=True,
+            )
+        else:
+            monthly_source = FigureSource(source_type=None, label=f"No monthly spending figure for {financial_year}")
 
     return DepartmentDetail(
-        id=dept.id,
-        name=dept.name,
-        code=dept.code,
-        division=dept.division,
-        financial_year=financial_year,
-        budget_estimate_lakhs=budget,
-        revised_estimate_lakhs=alloc.revised_estimate if alloc else None,
-        utilized_lakhs=total_utilized,
-        utilization_pct=round((total_utilized / budget * 100), 2) if budget > 0 else None,
-        is_capital=alloc.is_capital if alloc else False,
-        data_as_of=None,
+        **base.model_dump(exclude={"sources"}),
+        sources={**base.sources, "monthly_expenditure": monthly_source},
         monthly_expenditure=monthly,
     )
 
@@ -171,82 +200,85 @@ async def get_department_detail(
 async def get_gap_analysis(
     financial_year: str = Query("2024-25"),
     min_allocation_lakhs: int = Query(10000, description="Minimum allocation to include (in lakhs)"),
+    view: View = VIEW_QUERY,
     db: AsyncSession = Depends(get_db),
 ):
     """
-    Departments ranked by their unspent budget gap.
-    Highlights where allocated money is NOT being spent.
-    Fixed: was N+1 queries; now uses 3 batch queries total.
+    Departments ranked by their unspent budget gap: (PFMS release, or the allocation when no release
+    figure exists) − utilised. Departments with no spending figure get gap_flag "no_data", not 0%.
     """
-    from database.models import Scheme, SchemeProgress
+    figures = await department_figures(db, financial_year, view)
+    figures = {
+        d: f for d, f in figures.items()
+        if f.allocated.value is not None and f.allocated.value >= min_allocation_lakhs
+    }
+    if not figures:
+        return []
 
-    rows = (await db.execute(
-        select(Department, BudgetAllocation)
-        .join(BudgetAllocation, and_(
-            BudgetAllocation.department_id == Department.id,
-            BudgetAllocation.financial_year == financial_year,
-        ))
-        .where(
-            Department.is_active.is_(True),
-            BudgetAllocation.budget_estimate >= min_allocation_lakhs,
-        )
-    )).all()
+    departments = (await db.execute(
+        select(Department).where(Department.id.in_(list(figures)), Department.is_active.is_(True))
+    )).scalars().all()
 
-    dept_ids = [dept.id for dept, _ in rows]
-
-    # ── Batch: expenditure sums ───────────────────────────────────────────────
-    exp_rows = (await db.execute(
-        select(
-            Expenditure.department_id,
-            func.sum(Expenditure.utilized_amount).label("total"),
-        )
-        .where(
-            Expenditure.financial_year == financial_year,
-            Expenditure.department_id.in_(dept_ids),
-        )
-        .group_by(Expenditure.department_id)
-    )).all()
-    exp_map = {row.department_id: (row.total or 0) for row in exp_rows}
-
-    # ── Batch: PFMS central releases per department ───────────────────────────
+    # PFMS central releases (live only) per department
     pfms_rows = (await db.execute(
         select(
             Scheme.department_id,
             func.sum(SchemeProgress.funds_released).label("total"),
+            func.max(SchemeProgress.source).label("source"),
+            func.max(SchemeProgress.created_at).label("updated"),
         )
         .join(SchemeProgress, SchemeProgress.scheme_id == Scheme.id)
-        .where(SchemeProgress.financial_year == financial_year)
+        .where(SchemeProgress.financial_year == financial_year, Scheme.department_id.in_(list(figures)))
         .group_by(Scheme.department_id)
     )).all()
-    pfms_map = {row.department_id: (row.total or 0) for row in pfms_rows}
+    pfms = {r.department_id: r for r in pfms_rows if r.total}
 
     results = []
-    for dept, alloc in rows:
-        utilized = exp_map.get(dept.id, 0)
-        budget = alloc.budget_estimate
-        released = pfms_map.get(dept.id, 0)
+    for dept in departments:
+        fig = figures[dept.id]
+        allocated = fig.allocated.value
+        utilized = fig.utilized.value
+        # PFMS releases are live figures; don't mix them with audited totals.
+        release_row = pfms.get(dept.id) if fig.allocated.figure.source_type == "live" else None
+        released = float(release_row.total) if release_row else None
 
-        effective_release = max(released, budget) if released == 0 else released
-        gap = effective_release - utilized
-        util_pct = round((utilized / budget * 100), 2) if budget > 0 else 0
+        base = released if released is not None else allocated
+        gap = round(base - utilized, 2) if utilized is not None else None
+        util_pct = fig.utilization_pct
 
-        flag = "on_track"
-        if util_pct < 20:
+        if util_pct is None:
+            flag = "no_data"
+        elif util_pct < 20:
             flag = "critical"
         elif util_pct < 40:
             flag = "warning"
+        else:
+            flag = "on_track"
 
+        sources = {
+            "allocated_lakhs": to_source(fig.allocated),
+            "utilized_lakhs": to_source(fig.utilized),
+            "released_lakhs": FigureSource(
+                source_type="live",
+                label=f"{live_label({release_row.source})} (provisional)",
+                measure="released",
+                fetched_at=release_row.updated,
+                provisional=True,
+            ) if release_row else FigureSource(source_type=None, label="No live PFMS release figure; gap uses the allocation"),
+        }
         results.append(GapAnalysisItem(
             department_id=dept.id,
             department_name=dept.name,
             department_code=dept.code,
-            allocated_lakhs=budget,
-            released_lakhs=effective_release,
+            allocated_lakhs=allocated,
+            released_lakhs=released,
             utilized_lakhs=utilized,
             gap_lakhs=gap,
             utilization_pct=util_pct,
             gap_flag=flag,
+            view=view,
+            sources=sources,
         ))
 
-    results.sort(key=lambda x: x.gap_lakhs, reverse=True)
+    results.sort(key=lambda x: (x.gap_lakhs is not None, x.gap_lakhs or 0), reverse=True)
     return results
