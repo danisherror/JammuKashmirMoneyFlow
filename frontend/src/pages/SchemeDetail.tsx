@@ -5,7 +5,7 @@ import {
 } from 'recharts'
 import { useAppStore } from '../store'
 import { fetchSchemeDetail, fetchSchemeHistory } from '../lib/api'
-import { fmtLakhs, fmtPct, utilColor, schemeBadge, schemeTypeLabel } from '../lib/utils'
+import { fmtLakhs, fmtPct, utilColor, utilColorVar, schemeBadge, schemeTypeLabel } from '../lib/utils'
 import UtilBar from '../components/UtilBar'
 import PageHeader from '../components/PageHeader'
 import ErrorBox from '../components/ErrorBox'
@@ -85,7 +85,7 @@ export default function SchemeDetail() {
                 { label: 'TOTAL OUTLAY', val: data.total_outlay_lakhs, fmt: 'lakhs', color: '#5a7a9a' },
                 { label: 'FUNDS ALLOCATED', val: data.funds_allocated_lakhs, fmt: 'lakhs', color: '#00aaff' },
                 { label: 'FUNDS UTILIZED', val: data.funds_utilized_lakhs, fmt: 'lakhs', color: data.utilization_pct && data.utilization_pct >= 50 ? '#00ff88' : '#ff3366' },
-                { label: 'PHYSICAL PROGRESS', val: data.physical_pct, fmt: 'pct', color: utilColor(data.physical_pct).replace('text-', '#') },
+                { label: 'PHYSICAL PROGRESS', val: data.physical_pct, fmt: 'pct', color: utilColorVar(data.physical_pct) },
               ].map(({ label, val, fmt, color }) => (
                 <div key={label} className="panel">
                   <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 2, background: color }} />

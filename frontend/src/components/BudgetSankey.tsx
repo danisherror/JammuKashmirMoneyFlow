@@ -132,8 +132,9 @@ export default function BudgetSankey({ overview, departments, schemes }: BudgetS
         name: d.name.split(' (')[0].substring(0, 25),
         fill: '#64748b',
         type: 'Department',
-        expenditure: d.total_expenditure_lakhs,
-        utilizationPct: d.budget_estimate_lakhs > 0 ? (d.total_expenditure_lakhs / d.budget_estimate_lakhs) * 100 : 0,
+        // undefined (not 0) when utilisation is unknown, so the tooltip hides it
+        expenditure: d.utilized_lakhs ?? undefined,
+        utilizationPct: d.utilization_pct ?? undefined,
         totalBudget: overview.total_budget_lakhs
       })
     })

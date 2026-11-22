@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 import { useAppStore } from '../store'
-import { fetchSchemes, fetchDepartments } from '../lib/api'
+import { fetchSchemes, fetchDepartments, type SchemeType } from '../lib/api'
 import { fmtLakhs, fmtPct, utilColor, schemeBadge, schemeTypeLabel } from '../lib/utils'
 import UtilBar from '../components/UtilBar'
 import PageHeader from '../components/PageHeader'
@@ -13,7 +13,7 @@ import { Search } from 'lucide-react'
 export default function Schemes() {
   const { financialYear } = useAppStore()
   const navigate = useNavigate()
-  const [typeFilter, setTypeFilter] = useState<string>('all')
+  const [typeFilter, setTypeFilter] = useState<SchemeType | 'all'>('all')
   const [searchTerm, setSearchTerm] = useState('')
   const [deptFilter, setDeptFilter] = useState('all')
 
@@ -45,12 +45,12 @@ export default function Schemes() {
         right={
           <div className="flex flex-col md:flex-row items-end md:items-center gap-4">
             <div className="flex items-center gap-2">
-              {[
+              {([
                 { key: 'all', label: 'ALL' },
                 { key: 'css', label: 'CSS' },
                 { key: 'central', label: 'CENTRAL' },
                 { key: 'ut', label: 'UT' },
-              ].map(({ key, label }) => (
+              ] as const).map(({ key, label }) => (
                 <button key={key} onClick={() => setTypeFilter(key)}
                   className={`mono text-[8px] px-3 py-1.5 tracking-widest border transition-colors ${
                     typeFilter === key
