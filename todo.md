@@ -1,46 +1,258 @@
-# Future Roadmap & Pending Features
+# Roadmap to 9/10
 
-Here is a detailed breakdown of the remaining high-impact features for the J&K Public Money Flow Tracker. These represent the next major phases of development.
+Audit on 2026-11-22 (`docker-compose up --build`, every collector triggered, every endpoint hit, dashboard opened in a browser) scored the project **3/10**. The containers and API work. The project still fails at its one job: showing citizens **true** numbers about public money.
 
----
+Work through the phases in order. Each phase lists the score it should unlock. A task is finished only when its **Done when** check passes.
 
-### 1. Tender & DBT Dedicated UI (Frontend)
-**What to do:**
-Currently, our backend collects data for public works tenders (`jktenders.gov.in`) and Direct Benefit Transfers (`dbtbharat.gov.in`), and we allow exporting this data as CSVs. However, there is no visual dashboard for this data.
-*   **Tenders Page (`/tenders`)**: Build a dedicated data table showing recent tenders, their estimated vs. awarded costs, and status. Add a "Contractor Leaderboard" chart to visualize which contractors are winning the most government money, highlighting potential monopolies or concentration of public funds.
-*   **DBT Page (`/dbt`)**: Build a page focusing on the "Last Mile Gap." Visualize the gap between the number of beneficiaries enrolled in a scheme vs. those who actually received money in their bank accounts, broken down by district.
-
----
-
-### 2. Budget / CGA Collector (Backend Data Pipeline)
-**What to do:**
-Currently, the macro budget data (total department allocations and expenditures) relies on seed/mock data. To make it real-time, we need to build a complex collector.
-*   **Automated PDF Downloading**: Write a Python script to monitor `cga.nic.in` (Controller General of Accounts) for the monthly J&K expenditure PDF uploads.
-*   **PDF Extraction**: Use libraries like `pdfplumber` or `tabula-py` to parse the tabular data inside these PDFs, extracting the actual month-by-month spending for every department (PWD, Health, Education, etc.).
-*   **Integration**: Feed this extracted data into the `budget_allocations` and `expenditures` tables so the dashboard's macro numbers update automatically every month.
+**Ground rules for every task:**
+- **No invented numbers.** A missing number shows as "No data", never as a random value.
+- **Every figure is traceable.** Each stored record keeps the source URL, the time it was fetched, and the source document (or its hash).
+- **Claims about portal behaviour need a source URL** (see `CLAUDE.md`). Write "unknown / not yet checked" instead of an unsourced claim.
+- **Respect the portals.** Never work around CAPTCHAs, logins or bot blocks. If a source can only be reached that way, mark it unavailable and use a published alternative (official PDF/Excel reports, data.gov.in, an RTI reply).
 
 ---
 
-### 3. CAG Audit Alert Feed (AI Integration)
-**What to do:**
-The Comptroller and Auditor General (CAG) publishes massive 300+ page audit reports detailing financial irregularities, unspent funds, and corruption in J&K. These are buried in PDFs and hard for citizens to read.
-*   **PDF Parsing**: Automatically download new CAG reports for J&K.
-*   **AI Summarization**: Pass the raw text paragraphs to the Claude API (or Gemini API) with a prompt to extract the specific department involved, the amount of money flagged (in Lakhs), and a 2-sentence plain English summary of the irregularity.
-*   **Frontend Feed**: Create a Twitter-style "Audit Feed" on the Alerts page, tagging departments with severity badges (High/Medium/Low) based on the AI's classification.
+## Phase 0 — Make it run from a fresh clone (3 → 4)
+
+### 0.1 Restore the missing frontend `lib/` module
+`.gitignore:19` (`lib/`, from a Python template) also matched `frontend/src/lib/`. Git never tracked it, and it no longer exists locally either. Every page fails with `Failed to resolve import "../lib/api"`.
+- [ ] Change `lib/` and `lib64/` in `.gitignore` to `/backend/lib/` and `/backend/lib64/`, or delete them.
+- [ ] Recreate `frontend/src/lib/api.ts`. It needs an axios instance `api` (base URL `import.meta.env.VITE_API_BASE_URL`), a typed function per endpoint (`fetchBudgetOverview`, `fetchDepartments`, `fetchDepartmentDetail`, `fetchSchemes`, `fetchSchemeDetail`, `fetchSchemeHistory`, `fetchDistrictHeatmap`, `fetchDistrictDetail`, `fetchSyncStatus`, `triggerCollector`, `triggerAllCollectors`, `fetchLowUtilAlerts`, `fetchCAGFindings`, `fetchTenders`, `fetchContractorLeaderboard`, `fetchDBTSchemes`, `fetchDBTGap`), and the types the pages import (`BudgetOverview`, `DepartmentSummary`, `SchemeSummary`, `SchemeDistrictProgress`, `SchemeVelocity`, `LowUtilizationAlert`, `CAGFinding`, `DBTSchemeSummary`, …). Mirror `backend/api/schemas.py`.
+- [ ] Recreate `frontend/src/lib/utils.ts` (`fmtLakhs`, `fmtPct`, `utilColor`, `gradeColor`, `divisionLabel`, `schemeBadge`, `schemeTypeLabel`) and `frontend/src/lib/districtCoordinates.ts` (`DISTRICT_COORDINATES` for the 20 districts).
+- [ ] Better long-term: generate the TS types from `/openapi.json` (e.g. `openapi-typescript`) so the frontend and backend can't drift apart.
+
+**Done when:** `git clone` → `cp .env.example .env` → `docker-compose up --build` renders every route in the browser with no Vite overlay, and `npm run build` (which runs `tsc`) exits 0. That currently means fixing 72 type errors.
+
+### 0.2 Clean dev ergonomics
+- [ ] Remove the obsolete `version:` key from `docker-compose.yml`.
+- [ ] Turn off SQLAlchemy `echo` by default (`backend/database/connection.py:18`) and add a separate `SQL_ECHO` env var.
+- [ ] Pin frontend dependency versions exactly (keep `package-lock.json` authoritative) and use `npm ci` in `frontend/Dockerfile`.
+
+**Done when:** `docker-compose up` prints no `version` warning, the API log has no SQL statements unless `SQL_ECHO=true`, and `frontend/Dockerfile` uses `npm ci`.
+
+### 0.3 Minimal CI from day one
+Phases 1–3 are heavy refactors. Without CI, regressions go unnoticed until Phase 4.
+- [ ] Add `.github/workflows/ci.yml` running `ruff check backend`, `npm run build` (includes `tsc`) and `docker-compose build` on every push and PR.
+- [ ] Add each new check (pytest, vitest, mypy, e2e) to this workflow as soon as the phase that introduces it lands. Phase 4.3 then only finishes and gates it.
+
+**Done when:** a PR that breaks the frontend build shows a red check on GitHub.
 
 ---
 
-### 4. Overview Sankey Diagram (Data Visualization)
-**What to do:**
-The current Overview page shows static numbers in cards. A Sankey Diagram is the industry standard for visualizing money flow.
-*   **Integration**: Use `recharts` or a specialized library like `react-sankey` or `nivo` to build an interactive diagram on the `/` (Overview) page.
-*   **Flow Mapping**: Visually map the flow of funds: `Central Govt / J&K Tax Revenue` (Left side) → `J&K Finance Dept` (Middle) → `Line Departments` (Right side).
-*   **Interactivity**: Allow the user to hover over the thick bands of the diagram to see exactly what percentage of the UT budget is consumed by specific sectors (e.g., Security vs. Education vs. Infrastructure).
+## Phase 1 — Stop presenting fake data as real (4 → 6)
+
+This is the most important phase. A transparency tool that shows random numbers is worse than no tool.
+
+### 1.1 Remove the random-data fallbacks
+In these collectors, the "live" path always throws, so the random generator always runs:
+| Collector | What it does today |
+|---|---|
+| `pmay_collector.py` | loads the page, then `raise PlaywrightTimeoutError` unconditionally → `random.uniform` targets |
+| `pfms_collector.py` | same pattern → random release factors |
+| `tenders_collector.py` | same pattern → random tenders **and invented contractor names** ("M/S Sharma Constructions") |
+| `dbt_collector.py` | raises → random enrolment/payment numbers |
+| `cga_collector.py` | `_fetch_pdf()` returns `None`, `_parse_pdf()` is a stub → "Smart Simulation" |
+| `cag_collector.py` | runs over the hardcoded `MOCK_FINDINGS` list |
+
+- [ ] Delete every `_generate_simulated_data` / `_run_fallback_simulation` / `MOCK_FINDINGS` path. Follow the honest pattern already in `jjm_collector.py` and `mgnrega_collector.py`: a failure raises and is logged to `DataSyncLog`.
+- [ ] Write a one-off migration/script that deletes rows already saved with `source` containing `simulated`/`Simulation`, or `raw_data.note == "simulated fallback"`.
+- [ ] If demo data is still wanted for local development, put it behind `DEMO_MODE=true` (default `false`). Store it with `is_demo=true` and show a red site-wide "DEMO DATA — NOT REAL" banner while it's on. The API must refuse to start with `DEMO_MODE=true` when `APP_ENV=production`.
+
+**Done when:** `grep -rn "random\." backend/collectors` returns nothing outside the demo module, and a fresh database plus a run of every collector contains only rows that came from a real source.
+
+### 1.2 Report collector status truthfully
+- [ ] Add statuses `partial` and `no_source` to `DataSyncLog`. Only `success` when real rows were written.
+- [ ] Fix `next_run` in `/alerts/sync-status`. It hardcodes "06:00 IST daily", but `scheduler/jobs.py` schedules weekly + monthly. Read the real next fire time from APScheduler.
+- [ ] Make the README's "Data Sources" table match the actual scheduler.
+
+**Done when:** a collector that writes zero real rows logs `partial` or `no_source` (never `success`), and `next_run` in `/alerts/sync-status` equals APScheduler's `job.next_run_time` for that job.
+
+### 1.3 Make the UI honest about provenance and freshness
+- [ ] Every KPI, chart and table shows "Source: <portal> · fetched <date>" with a link to the source document.
+- [ ] Empty states say "No data collected yet from <source> — last attempt failed: <reason>" instead of showing `0` or `0.0%`. Today a missing utilisation shows as `0.0%` with a `critical` gap flag (`/budget/gap-analysis`), which is misleading.
+- [ ] Separate "₹0 spent" (a real zero) from "unknown" (`null`) all the way through the API schema and the UI.
+
+**Done when:** on an empty database, every page shows "No data" states (no `0`, `0.0%` or `critical` flags), and every populated figure shows its source and fetch date.
+
+### 1.4 Provenance in the data model
+The ground rules require every record to be traceable, but the models can't store that today. `SchemeProgress` has only a free-text `source` and `raw_data`; `BudgetAllocation` and `Expenditure` have only a default `source` string.
+- [ ] Add a `raw_snapshots` table: `id`, `source_url`, `fetched_at`, `sha256`, `content_type`, `storage_path`, `collector_name`.
+- [ ] Add a non-null `snapshot_id` foreign key to every fact table (`budget_allocations`, `expenditures`, `scheme_progress`, `tenders`, `cag_findings`, DBT tables). Expose `source_url`, `fetched_at` and a snapshot download link in every API response schema.
+- [ ] Add `GET /api/v1/snapshots/{id}` to download the stored raw file.
+
+**Done when:** no fact row can be inserted without a `snapshot_id`, and any figure in the API can be followed to a downloadable raw file whose SHA-256 matches.
+
+### 1.5 Store money without losing precision
+Money columns are `BigInteger` in lakhs, so anything below ₹1 lakh is truncated (the tenders code already computes `round(x, 2)` lakhs, then stores it as an integer).
+- [ ] Change every money column to `Numeric(14, 2)` (lakhs, two decimals) and use `Decimal` in Pydantic schemas. Do this in the Alembic baseline (3.1), or as its first migration if 3.1 is already done.
+- [ ] Add a units note to each money field's schema description ("₹ lakhs").
+
+**Done when:** a value of 0.37 lakh round-trips through DB → API → UI unchanged.
+
+### 1.6 Collect politely and honestly
+`base_collector.py:43` sends a fake Chrome User-Agent "because govt portals sometimes block non-browser user agents". That contradicts the "respect the portals" ground rule.
+- [ ] Use an honest User-Agent naming the project and a contact URL (e.g. `JKMoneyFlowBot/1.0 (+<repo URL>)`).
+- [ ] Check and honour `robots.txt` for each portal before fetching. Record the result (allowed / disallowed, date checked) next to the source URL.
+- [ ] If a portal blocks the honest UA, mark that collector `no_source`. Don't spoof.
+
+**Done when:** `grep -rn "Mozilla" backend/collectors` returns nothing, and each collector's source comment records its `robots.txt` status.
 
 ---
 
-### 5. PFMS Collector (Advanced Backend Pipeline)
-**What to do:**
-The Public Financial Management System (PFMS) is the central nodal agency for releasing scheme funds. Currently, we track when money reaches the ground (via MGNREGA/JJM portals), but not when it leaves Delhi.
-*   **Scraping PFMS**: Build a scraper (likely using Playwright due to complex JS/Captcha mechanics on `pfms.nic.in`) to track the exact date and amount of Central Sector funds released to J&K implementing agencies.
-*   **Gap Analysis**: This allows us to calculate the ultimate gap metric: *Central Release → State Receipt → Actual Utilization*. This explicitly highlights where money is parked idle in nodal bank accounts.
+## Phase 2 — Real data, end to end (6 → 7.5)
+
+One fully real pipeline is worth more than six fake ones. Do these one at a time and finish each before starting the next.
+
+### 2.1 Fix the two honest collectors first
+Observed on 2026-11-22:
+- **JJM:** `GET https://ejalshakti.gov.in/jjmreport/api/JJMIndia/GetDistrictData?stateCode=01&type=D` → **404**.
+- **MGNREGA:** the request to `nreganarayan.nic.in` failed with `[Errno -2] Name or service not known` (DNS lookup failed).
+
+- [ ] **First check whether the MGNREGA domain is real.** The DNS failure may mean `nreganarayan.nic.in` never existed rather than an outage. The MGNREGA reports site may be `nreganarep.nic.in`, but that is not yet checked. Confirm the correct host with a source URL, then fix it in `mgnrega_collector.py` and in `CLAUDE.md`'s list of sources.
+- [ ] Find the current official endpoint or report page for each one and record the source URL in a code comment. Check data.gov.in for an official dataset before scraping HTML.
+- [ ] Save the raw response (HTML/JSON/PDF) to `raw_snapshots/` (or object storage) with a SHA-256 hash, and link it from every derived row. That lets anyone re-check a number later.
+- [ ] Add parser tests against saved fixture files (see 4.1), so a change in the portal's layout breaks CI, not production.
+
+**Done when:** JJM and MGNREGA district-level numbers for J&K appear on the dashboard, and each number links back to its source snapshot.
+
+### 2.2 Budget from official documents (CGA / J&K budget)
+- [ ] Find the actual published J&K monthly accounts / budget documents and record their URLs. Don't assume a format before checking.
+- [ ] Implement `_fetch_pdf` and `_parse_pdf` with `pdfplumber`, tested against at least 3 real saved PDFs.
+- [ ] Replace the seed allocations in `database/seeds.py`. Line 61 says they are "scaled down by ~10% for demonstration", so they are made up. Load the published Budget Estimates instead, with a citation for each figure.
+
+**Done when:** every `budget_allocations` and `expenditures` row links to a snapshot of an official PDF, and the parser tests pass on at least 3 saved PDFs.
+
+### 2.3 CAG findings from real reports
+- [ ] Download the real J&K audit reports, split them into paragraphs, and keep the page numbers.
+- [ ] Use LLM extraction (Claude or Gemini) with a strict JSON schema. Store the **verbatim source paragraph + page number** next to the summary. Set the model in config, not hardcoded (`gemini-2.0-flash` is in `cag_collector.py` today).
+- [ ] Check every extracted amount against the source text (the number must appear in the paragraph). Send anything that fails to a review queue; never publish it automatically.
+- [ ] Upgrade `google-genai` (pinned at an early `0.3.0`) or switch providers; either way, read the model name from config.
+
+**Done when:** every published finding shows its verbatim paragraph, report title and page number, and no finding with an unverified amount is visible publicly.
+
+### 2.4 Tenders, DBT, PMAY, PFMS
+- [ ] For each one, record whether a public, automation-friendly source exists (URL + date checked). If the only route is through a CAPTCHA or login, set the collector to `no_source`, hide the page or show "source unavailable", and note the alternative being pursued (published reports, RTI).
+- [ ] Bring back the contractor leaderboard only with real award data, and name a contractor only when an official award notice is linked.
+
+**Done when:** each of the four has a recorded status (live / `no_source`, with URL and date checked), and no page shows data for a `no_source` collector.
+
+### 2.5 Remove hardcoded dates
+- [ ] Work out the current financial year (April–March) instead of defaulting to `"2024-25"` (`api/routes/budget.py`, `alerts.py`, `dbt.py`, `pmay_collector.py`, `cga_collector.py`, …).
+- [ ] Add a financial-year selector in the UI, populated from the years that actually have data.
+- [ ] Fix `/schemes/{id}/history` returning `days_elapsed: 965` for a year that has already ended.
+
+**Done when:** `grep -rn '"2024-25"' backend frontend/src` returns nothing outside tests and fixtures, and `days_elapsed` never exceeds the length of the financial year.
+
+### 2.6 One canonical list of districts
+Each portal spells districts differently (e.g. Budgam/Badgam, Shopian/Shupiyan, Bandipora/Bandipore). Data from before 31 Oct 2019 also includes Ladakh (Leh, Kargil), which is now a separate UT. Without a mapping, joins across sources quietly drop rows.
+- [ ] Add a `district_aliases` table (alias → `district_id`, source) and resolve every scraped name through it in `data_cleaner.py`.
+- [ ] Unknown names fail loudly: the row is skipped, and the name is logged and shown on the sync-status page so someone can add an alias.
+- [ ] Exclude Leh/Kargil from J&K totals, or label them as historical, for years before 2019-20.
+
+**Done when:** parser tests cover every alias seen in the saved fixtures, and no collector run logs an unmapped district without it showing up on the sync-status page.
+
+### 2.7 Fallback plan if sources stay unavailable
+Phase 2 depends on outside portals, and some may have no automation-friendly source at all.
+- [ ] After 2.1–2.4, write down which sources are live. The 9/10 bar is **"every number shown is real, traceable and honestly labelled"**, not "all 8 collectors live".
+- [ ] Minimum for a 9: at least three live sources with snapshots (e.g. JJM + budget documents + CAG). Every other source is shown as "source unavailable", with the reason and the alternative being pursued (published reports, RTI).
+
+---
+
+## Phase 3 — Production-grade backend (7.5 → 8.5)
+
+### 3.1 Schema migrations
+- [ ] Set up Alembic (it's already in `requirements.txt`, but there's no `alembic/` folder) and write a baseline migration from `database/models.py`. Replace `init_db()`'s `create_all` with `alembic upgrade head`.
+
+**Done when:** a fresh database built by `alembic upgrade head` matches the models (`alembic check` reports no differences), and `create_all` is gone from startup.
+
+### 3.2 Security
+- [ ] Protect `POST /alerts/trigger/{name}` and `/alerts/trigger-all` with an admin API key or token. Right now anyone can make the server launch 8 headless Chromium browsers.
+- [ ] Rate-limit public endpoints (e.g. `slowapi`) and cache read endpoints in Redis. Redis already runs but is barely used; the `cache_ttl_*` settings exist.
+- [ ] Remove default secrets. Fail at startup if `SECRET_KEY` is the default value outside development. Move CORS origins into config.
+- [ ] Run Playwright collectors in a separate worker process or container, not in the API's `BackgroundTasks`, so a hung browser can't take down the API. This also fixes the blocking sync `httpx.Client` and sync DB sessions that currently run inside the async app.
+
+**Done when:** unauthenticated trigger calls return 401, burst requests get 429, the API refuses to start with the default `SECRET_KEY` outside development, and killing the worker mid-collection leaves the API responding.
+
+### 3.3 Reliability
+- [ ] Make collector writes idempotent (upsert on natural keys), with retries + backoff (`tenacity` is already a dependency) and a per-collector timeout.
+- [ ] Use a scheduler job store (APScheduler + Postgres) so jobs aren't duplicated when there's more than one API replica.
+- [ ] Use structured JSON logs (loguru `serialize=True`) and add `/health/ready`, which checks the database, Redis and the last successful run per collector.
+- [ ] Send alerts (Telegram/email; the settings already exist in `config.py`) when a collector has failed N runs in a row or data is older than its SLA.
+
+**Done when:** running a collector twice in a row inserts no duplicate rows, `/health/ready` returns 503 when Postgres is down, and a forced failure streak sends an alert.
+
+### 3.4 Deployment and operations
+A transparency tool earns a 9 only if citizens can actually reach it.
+- [ ] Pick a host and deploy the frontend, API, worker, Postgres and Redis with HTTPS and a real domain.
+- [ ] Back up Postgres every night and keep backups off the host, for at least 30 days. Test a restore once and write down the steps.
+- [ ] Choose durable storage for `raw_snapshots` (object storage, not the container disk) and a retention policy. Snapshots that back published figures are never deleted.
+- [ ] Add a public status page, or a `/status` route, that shows each collector's last success.
+
+**Done when:** the public URL serves the dashboard over HTTPS, and a documented restore from last night's backup has been carried out successfully.
+
+---
+
+## Phase 4 — Tests and CI (8.5 → 9)
+
+### 4.1 Backend tests (`pytest`)
+- [ ] **Parser tests:** saved real HTML/JSON/PDF fixtures → expected rows, one file per collector.
+- [ ] **API tests:** `httpx.AsyncClient` against a test Postgres (testcontainers or the compose service), covering every route: happy path, 404, 422, empty data, and null-vs-zero handling.
+- [ ] **Processor tests:** `gap_calculator.py` and `data_cleaner.py`, including edge cases (zero allocation, missing release, future dates).
+- [ ] Coverage ≥ 80% on `api/`, `processors/` and collector parsers.
+
+### 4.2 Frontend tests
+- [ ] Vitest + React Testing Library on the formatters (`fmtLakhs`, `fmtPct`) and on the loading / error / empty states of each page.
+- [ ] One Playwright e2e smoke test: the stack boots, and every nav route renders with no console errors.
+
+### 4.3 CI (GitHub Actions)
+- [ ] On every PR: `ruff` + `mypy` (backend), `tsc --noEmit` + `eslint` (frontend), pytest, vitest, a docker-compose build, and the e2e smoke test.
+- [ ] Block merges on a red build. Add a `pre-commit` config so the same checks run locally.
+
+**Done when:** branch protection on `main` requires the CI workflow, and the coverage report shows ≥ 80% on the targeted modules.
+
+---
+
+## Phase 5 — The polish that earns a 9+
+
+### 5.1 Data-verification page for citizens
+- [ ] Turn `How to Verify Dashboard Data is Correct.md` into an in-app `/methodology` page: where each number comes from, how gaps are calculated, known limitations, and a link to the raw snapshot for every figure.
+- [ ] A "Report an error" link on each figure (opens a pre-filled GitHub issue).
+
+**Done when:** `/methodology` exists and links to it from every page footer, and every figure has a working "Report an error" link.
+
+### 5.2 UX and accessibility
+- [ ] Responsive layout down to 360px, keyboard navigation, alt text / table alternatives for charts and the map, and WCAG AA contrast.
+- [ ] Shareable URLs. Filters (year, district, scheme) live in the query string.
+- [ ] Hindi/Urdu labels (i18n) for the main pages. (Polish beyond 9; do it last.)
+
+**Done when:** Lighthouse accessibility ≥ 95 on every route, every page works at 360px with no horizontal scroll, and reloading a filtered URL restores the same view.
+
+### 5.3 Open data
+- [ ] Keep CSV/ZIP export, and add a licence + data dictionary file to every export.
+- [ ] Publish a versioned public API with documented fields and units (all money in ₹ lakhs, stated explicitly). (Polish beyond 9.)
+- [ ] State the licence of each source's data (e.g. GODL-India for data.gov.in), with a source URL, before republishing it.
+
+**Done when:** every export ZIP contains `LICENSE` and `DATA_DICTIONARY.md`, and every money field in `/openapi.json` states its unit.
+
+### 5.4 Docs and hygiene
+- [ ] Rewrite `README.md`: architecture diagram, an honest table of each data source's status (live / no source / failing), how to add a collector, how to run tests.
+- [ ] Fold `Project.md` into the README or `docs/`, and keep this file as the single roadmap.
+- [ ] Add a `LICENSE` and `CONTRIBUTING.md`, and use descriptive commit messages (recent history is "fixing lots of bugs and enhancements" ×3).
+
+**Done when:** a new contributor can go from clone to a running stack and a passing test suite using only `README.md`.
+
+---
+
+## Scorecard
+
+| Area | Now | Target | Phases |
+|---|---|---|---|
+| Runs from a fresh clone | ✗ (frontend broken) | ✓ | 0 |
+| Data is real and traceable | ✗ (6/8 collectors produce random data, no provenance columns) | ✓ | 1, 2 |
+| Honest status and freshness | ✗ | ✓ | 1 |
+| Migrations / security / reliability | ✗ | ✓ | 3 |
+| Publicly deployed with backups | ✗ | ✓ | 3.4 |
+| Tests + CI | 0 tests, no CI | ≥ 80% coverage, gated CI | 0.3, 4 |
+| Methodology, a11y, open data | partial | ✓ | 5 |
+
+Phases 0–1 alone get the project to about **6**. A **9** needs at least three sources live with snapshots (2.1 + 2.2 + 2.3, or the fallback in 2.7), plus Phases 3 and 4, including deployment (3.4). Phase 5 makes it trustworthy enough to share publicly.
