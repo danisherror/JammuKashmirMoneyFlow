@@ -6,7 +6,9 @@ Budget figures from: J&K Budget 2024-25 documents (jkfinance.nic.in)
 """
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
-from database.models import Department, District, Scheme, BudgetAllocation, DivisionType, SchemeType
+from database.models import (
+    Department, District, Scheme, BudgetAllocation, DivisionType, SchemeType, GrantDepartmentMap,
+)
 
 
 # ── Departments ───────────────────────────────────────────────────────────────
@@ -260,6 +262,38 @@ SCHEMES = [
 ]
 
 
+# ── Grant → department mapping (Appropriation Accounts) ───────────────────────
+# The CAG accounts list 36 numbered grants; the tracker has 20 departments. Only grants whose
+# name clearly matches a tracker department are mapped. The rest stay unmapped and are shown
+# under their official grant name. Each entry carries a fragment of the official grant name;
+# tests/test_grant_department_map.py checks it against the parsed PDF for every year listed,
+# so a renumbered grant fails CI instead of being mapped to the wrong department.
+# Grant numbers and names checked identical in 2021-22, 2022-23 and 2023-24 (2026-11-22).
+GRANT_MAP_YEARS = ("2021-22", "2022-23", "2023-24")
+GRANT_DEPARTMENT_MAP = [
+    # (grant_no, fragment of official grant name, department code, note)
+    (1,  "General Administration",       "GAD",        None),
+    (2,  "Home",                         "POLICE",     None),
+    (6,  "Power Development",            "PDD",        None),
+    (7,  "Education",                    "SCHOOLEDU",  "Grant is titled 'Education Department'; higher education is grant 27."),
+    (8,  "Finance",                      "FINANCE",    "Includes pensions and debt servicing (charged)."),
+    (11, "Industry and Commerce",        "INDUSTRIES", None),
+    (12, "Agriculture",                  "AGRI",       None),
+    (13, "Sheep Husbandary",             "ANIMAL",     None),
+    (14, "Revenue",                      "REVENUE",    None),
+    (16, "Public Works",                 "PWD",        None),
+    (17, "Health",                       "HEALTH",     None),
+    (18, "Social Welfare",               "SOCIALWEL",  None),
+    (20, "Tourism",                      "TOURISM",    None),
+    (21, "Forest",                       "FOREST",     None),
+    (23, "Public Health Engineering",    "JALSHAKTI",  "Only PHE; Irrigation and Flood Control (grant 22) is not mapped."),
+    (25, "Labour",                       "LABOUR",     "Grant also covers Stationery and Printing."),
+    (27, "Higher Education",             "HIGHEREDU",  None),
+    (28, "Rural Development",            "RDPR",       None),
+    (32, "Horticulture",                 "HORTI",      None),
+]
+
+
 # ── Seed Functions ────────────────────────────────────────────────────────────
 
 async def seed_departments(db: AsyncSession):
@@ -348,3 +382,22 @@ async def seed_schemes(db: AsyncSession):
             description=s["description"],
         )
         db.add(scheme)
+
+
+async def seed_grant_department_map(db: AsyncSession):
+    result = await db.execute(select(Department.code, Department.id))
+    dept_ids = dict(result.all())
+    for fy in GRANT_MAP_YEARS:
+        for grant_no, _fragment, code, note in GRANT_DEPARTMENT_MAP:
+            if code not in dept_ids:
+                continue
+            existing = await db.execute(
+                select(GrantDepartmentMap).where(
+                    GrantDepartmentMap.financial_year == fy,
+                    GrantDepartmentMap.grant_no == grant_no,
+                )
+            )
+            if existing.scalar_one_or_none():
+                continue
+            db.add(GrantDepartmentMap(financial_year=fy, grant_no=grant_no, department_id=dept_ids[code], note=note))
+    await db.flush()

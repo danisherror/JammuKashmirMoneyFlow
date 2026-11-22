@@ -33,6 +33,9 @@ class Settings(BaseSettings):
     critical_gap_threshold_pct: int = 20
     warning_gap_threshold_pct: int = 40
 
+    # Saved copies of source documents (PDF/HTML/JSON), named by SHA-256
+    raw_snapshot_dir: str = "raw_snapshots"
+
     # AI Integration
     gemini_api_key: str | None = None
 

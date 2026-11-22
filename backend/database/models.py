@@ -1,6 +1,6 @@
 from sqlalchemy import (
     Column, Integer, String, Float, Date, DateTime,
-    Boolean, Text, ForeignKey, Enum as SAEnum, JSON, BigInteger
+    Boolean, Text, ForeignKey, Enum as SAEnum, JSON, BigInteger, UniqueConstraint
 )
 from sqlalchemy.orm import declarative_base, relationship
 from sqlalchemy.sql import func
@@ -266,6 +266,70 @@ class CAGFinding(Base):
     page_number = Column(Integer, nullable=True)
     source_pdf_url = Column(String(500), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+
+# ── Official documents (PDF) ──────────────────────────────────────────────────
+
+class SourceSnapshot(Base):
+    """
+    One saved copy of a source document (PDF/HTML/JSON), identified by its SHA-256.
+    Rows derived from the document point here so anyone can re-check a figure.
+    """
+    __tablename__ = "source_snapshots"
+
+    id = Column(Integer, primary_key=True)
+    source_type = Column(String(50), index=True, nullable=False)    # "appropriation_accounts"
+    title = Column(String(300), nullable=True)
+    source_url = Column(String(500), nullable=False)
+    sha256 = Column(String(64), unique=True, nullable=False)
+    storage_path = Column(String(500), nullable=False)              # relative to settings.raw_snapshot_dir
+    content_type = Column(String(100), nullable=True)
+    byte_size = Column(BigInteger, nullable=False)
+    fetched_at = Column(DateTime(timezone=True), nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+
+class AppropriationAccountLine(Base):
+    """
+    One row of the "Summary of Appropriation Accounts" (CAG, audited, annual).
+    Amounts are in ₹ THOUSAND exactly as printed — not lakhs like the older tables.
+    final_grant is original + supplementary (not the Budget Estimate); expenditure is gross.
+    Department is resolved through GrantDepartmentMap, so the mapping can be fixed without reloading.
+    """
+    __tablename__ = "appropriation_account_lines"
+    __table_args__ = (
+        UniqueConstraint("financial_year", "grant_no", "section", "kind", name="uq_appropriation_line"),
+    )
+
+    id = Column(Integer, primary_key=True)
+    snapshot_id = Column(Integer, ForeignKey("source_snapshots.id"), index=True, nullable=False)
+    financial_year = Column(String(10), index=True, nullable=False)
+    grant_no = Column(Integer, nullable=False)
+    grant_name_raw = Column(String(300), nullable=False)
+    section = Column(String(10), nullable=False)                    # "revenue" | "capital"
+    kind = Column(String(10), nullable=False)                       # "voted" | "charged"
+    final_grant_thousand = Column(BigInteger, nullable=False)
+    gross_expenditure_thousand = Column(BigInteger, nullable=False)
+    saving_thousand = Column(BigInteger, nullable=False)
+    excess_thousand = Column(BigInteger, nullable=False)
+    page = Column(Integer, nullable=False)                          # page in the snapshot PDF
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    snapshot = relationship("SourceSnapshot")
+
+
+class GrantDepartmentMap(Base):
+    """Which tracker department a numbered grant belongs to, per financial year."""
+    __tablename__ = "grant_department_map"
+    __table_args__ = (UniqueConstraint("financial_year", "grant_no", name="uq_grant_department"),)
+
+    id = Column(Integer, primary_key=True)
+    financial_year = Column(String(10), index=True, nullable=False)
+    grant_no = Column(Integer, nullable=False)
+    department_id = Column(Integer, ForeignKey("departments.id"), index=True, nullable=False)
+    note = Column(Text, nullable=True)
+
+    department = relationship("Department")
 
 
 # ── Sync / Health Tracking ────────────────────────────────────────────────────

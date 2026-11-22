@@ -117,11 +117,44 @@ Observed on 2026-11-22:
 **Done when:** JJM and MGNREGA district-level numbers for J&K appear on the dashboard, and each number links back to its source snapshot.
 
 ### 2.2 Budget from official documents (CGA / J&K budget)
-- [ ] Find the actual published J&K monthly accounts / budget documents and record their URLs. Don't assume a format before checking.
-- [ ] Implement `_fetch_pdf` and `_parse_pdf` with `pdfplumber`, tested against at least 3 real saved PDFs.
-- [ ] Replace the seed allocations in `database/seeds.py`. Line 61 says they are "scaled down by ~10% for demonstration", so they are made up. Load the published Budget Estimates instead, with a citation for each figure.
+Observed on 2026-11-22: the CAG publishes the J&K **Appropriation Accounts** and **Finance Accounts (Vol I/II)** every year as text PDFs (not scans), with a "Summary of Appropriation Accounts" table listing every grant (department) as Revenue/Capital × Voted/Charged, with final grant, gross expenditure, saving and excess in ₹ thousand. Source URLs are in `backend/tests/fixtures/appropriation_accounts/SOURCES.md`. The table layout changes slightly from year to year (see the module docstring), so every new year needs a fixture and a test.
 
-**Done when:** every `budget_allocations` and `expenditures` row links to a snapshot of an official PDF, and the parser tests pass on at least 3 saved PDFs.
+- [x] Find published J&K accounts documents and record their URLs (Appropriation Accounts 2021-22, 2022-23, 2023-24 on cag.gov.in; Finance Accounts Vol I/II for the same years). Checked 2026-11-22.
+- [x] Parse the Summary of Appropriation Accounts with `pdfplumber`: `backend/parsers/appropriation_accounts.py` (also runs as a CLI: `python -m parsers.appropriation_accounts <pdf> --format csv`). Tested against 3 real PDFs (2021-22, 2022-23, 2023-24) in `backend/tests/test_appropriation_accounts.py`. Each row must satisfy grant − expenditure = saving − excess and the rows must add up to the printed totals; otherwise the whole document is rejected.
+- [x] Store annual figures in their own table, not in `budget_allocations` (the "grant" column is the *final* grant, original + supplementary, not the Budget Estimate) or `expenditures` (monthly). Done: `appropriation_account_lines` (amounts in ₹ thousand, exactly as printed; unique per year + grant + section + kind) and `source_snapshots` (URL, SHA-256, file path, size, fetch time) in `database/models.py`. Tables are created by `create_all` on startup; move them to Alembic with the rest in 3.1.
+- [x] Map grant numbers to `departments` with `grant_department_map` (keyed on `financial_year` + `grant_no`, seeded from `GRANT_DEPARTMENT_MAP` in `database/seeds.py`). 19 of the 36 grants match a tracker department; the other 17 (e.g. Planning, Law, Irrigation and Flood Control, Housing and Urban Development) stay unmapped and are shown under their official name. `tests/test_grant_department_map.py` checks each mapped grant's name against every year's PDF. **Open:** decide whether the tracker's department list should become the 36 official grants (the seeded 20 are not from an official source).
+- [x] Loader `backend/loaders/appropriation_accounts.py`: download → parse and validate → save to `raw_snapshots/appropriation_accounts/<sha256>.pdf` → replace that year's rows in one transaction. Reloading the same file changes nothing; a reissued file replaces the year's rows and keeps the old snapshot record. Run with `docker compose exec api python -m loaders.appropriation_accounts --all`. Loaded 2021-22 (73 rows), 2022-23 (75) and 2023-24 (77) on 2026-11-22; the SHA-256 of each download matched `SOURCES.md`.
+- [ ] Run the loader on a schedule (monthly is enough) so a newly published year or a reissued PDF gets picked up, and record each run in `data_sync_log`.
+- [ ] Go back further: 2020-21 (listed at https://saiindia.gov.in/uploads/state_accounts_report/account-report-Appropriation-2020-21-English-UT-J-K-062fdbe90c04c34-62439162.pdf; saiindia.gov.in timed out on 2026-11-22, but the same path on cag.gov.in worked for 2021-22, so try that), then 2019-20, which was published as a combined "UT J&K and Ladakh" account and must be labelled as such (see 2.6). Add a fixture + test for each year before loading it.
+- [ ] Add 2024-25 when the CAG publishes it, with a new fixture; expect small layout changes.
+- [ ] Net expenditure: the Appropriation Accounts are gross. The reconciliation table right after the summary (and Finance Accounts Statement 11) gives recoveries and net totals; parse it if the dashboard shows net spend.
+- [ ] Budget Estimates are still needed for the current year, from the J&K budget documents (source not yet checked). Replace the seed allocations in `database/seeds.py` with them. Line 61 says the seeds are "scaled down by ~10% for demonstration", so they are made up. Cite each figure.
+- [ ] Monthly spending: a published monthly accounts source for J&K (CGA or the Accountant General) is not yet found. Until it is, remove `CGACollector._run_fallback_simulation` (it invents numbers) and show "No data" for monthly spend.
+
+**Done when:** every past-year department figure shown on the dashboard comes from `appropriation_account_lines` with a link to its snapshot and page, the parser tests pass on at least 3 saved PDFs (✅ 2026-11-22), and the current-year Budget Estimates in `budget_allocations` each cite an official document.
+
+### 2.2a Three views: Live, Official, Combined
+Agreed 2026-11-22. The dashboard offers three views of the same figures:
+
+| View | Source | Best for |
+|---|---|---|
+| **Live** | Portal collectors (JJM, MGNREGA, PMAY, DBT, tenders) | Current year, district and scheme detail. Provisional. |
+| **Official** | CAG PDFs (Appropriation Accounts now; Finance Accounts and audit reports later) | Past years, audited department totals with a page reference. |
+| **Combined** (default) | Worked out from the two above at query time, never stored | One complete timeline for citizens. |
+
+Rules for Combined:
+1. A closed year covered by a CAG PDF shows the **PDF figure**.
+2. The current year, or a year the CAG hasn't published yet, shows the live figure, labelled "provisional".
+3. If both exist and differ by more than 2%, show the **PDF figure with a flag**: "Portal said ₹X, audited accounts say ₹Y". (Decided: PDF + flag, not both side by side.)
+4. If neither exists, show "No data", never 0.
+
+Every figure carries its source label, e.g. "Official · Appropriation Accounts 2022-23, p.4" or "Live · ejalshakti.gov.in, fetched 22 Nov".
+
+- [x] **Step 1: official data in the database.** Tables, grant → department mapping and loader for the three parsed years (see 2.2).
+- [ ] **Step 2: API.** Add `?view=live|official|combined` (default `combined`) to the budget, department and scheme routes in `backend/api/routes/`. Put the Combined rules and the 2% threshold in one module, with tests. Every figure in a response carries `source_type`, `source_url`, `snapshot_id`, `page` and `fetched_at`, and Combined adds `mismatch: {live, official, diff_pct}` when rule 3 applies.
+- [ ] **Step 3: dashboard.** A Live / Official / Combined switch in the header (kept in the URL so links can be shared) and a source badge on every figure. Flagged figures show both numbers on hover or tap.
+- [ ] **Step 4: mismatch page.** List every Live-vs-Official difference above the threshold, next to the Alerts page.
+- [ ] Portals report by scheme and the PDFs by department grant, so Combined can only compare them at department level, through `grant_department_map`. Until scheme spending can be added up per grant, show scheme-level figures as Live only.
 
 ### 2.3 CAG findings from real reports
 - [ ] Download the real J&K audit reports, split them into paragraphs, and keep the page numbers.
@@ -196,7 +229,7 @@ A transparency tool earns a 9 only if citizens can actually reach it.
 ## Phase 4 — Tests and CI (8.5 → 9)
 
 ### 4.1 Backend tests (`pytest`)
-- [ ] **Parser tests:** saved real HTML/JSON/PDF fixtures → expected rows, one file per collector.
+- [ ] **Parser tests:** saved real HTML/JSON/PDF fixtures → expected rows, one file per collector. Started: `tests/test_appropriation_accounts.py` (3 real PDFs). `pytest` runs from `backend/` (`pytest.ini` sets the import path), and CI has a `backend-tests` job that installs only `pdfplumber`, `sqlalchemy` and `pytest` for now. Loader tests use in-memory SQLite: `tests/test_appropriation_loader.py`, `tests/test_grant_department_map.py`.
 - [ ] **API tests:** `httpx.AsyncClient` against a test Postgres (testcontainers or the compose service), covering every route: happy path, 404, 422, empty data, and null-vs-zero handling.
 - [ ] **Processor tests:** `gap_calculator.py` and `data_cleaner.py`, including edge cases (zero allocation, missing release, future dates).
 - [ ] Coverage ≥ 80% on `api/`, `processors/` and collector parsers.

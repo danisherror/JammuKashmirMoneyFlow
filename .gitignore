@@ -99,3 +99,6 @@ playwright/.cache/
 # Database
 *.sqlite3
 *.db
+
+# Saved source documents (can be large; back up separately, see todo.md 3.4)
+backend/raw_snapshots/

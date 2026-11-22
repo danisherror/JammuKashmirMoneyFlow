@@ -75,10 +75,11 @@ async def seed_reference_data():
     Insert static reference data that doesn't come from scrapers.
     Safe to call multiple times — uses INSERT OR IGNORE logic.
     """
-    from database.seeds import seed_departments, seed_districts, seed_schemes
+    from database.seeds import seed_departments, seed_districts, seed_schemes, seed_grant_department_map
     async with AsyncSessionLocal() as db:
         await seed_departments(db)
         await seed_districts(db)
         await seed_schemes(db)
+        await seed_grant_department_map(db)
         await db.commit()
     logger.info("Reference data seeded.")
