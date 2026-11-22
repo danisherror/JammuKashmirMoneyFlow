@@ -22,6 +22,24 @@ jobs:
       - name: Ruff
         run: ruff check backend
 
+  backend-tests:
+    name: Backend tests (pytest)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      # Parser/loader tests need only pdfplumber + SQLAlchemy (SQLite in memory). Switch to
+      # `pip install -r requirements-dev.txt` once API tests (todo.md 4.1) need the full app.
+      - name: Install test dependencies
+        run: pip install pdfplumber==0.11.0 sqlalchemy==2.0.30 pytest==8.3.4
+      - name: Pytest
+        run: pytest -q
+
   frontend-build:
     name: Frontend build (tsc + vite)
     runs-on: ubuntu-latest
