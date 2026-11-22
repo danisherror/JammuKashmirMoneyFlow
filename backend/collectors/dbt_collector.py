@@ -3,7 +3,6 @@ Direct Benefit Transfer (DBT) Collector for J&K
 Source: dbtbharat.gov.in
 Updates: Weekly
 """
-import time
 import random
 from datetime import date
 from loguru import logger

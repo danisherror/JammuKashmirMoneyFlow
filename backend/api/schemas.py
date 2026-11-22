@@ -2,7 +2,7 @@
 Pydantic schemas for all API request/response models.
 These define exactly what the frontend receives from every endpoint.
 """
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 from typing import Optional
 from datetime import date, datetime
 from enum import Enum

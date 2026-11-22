@@ -2,7 +2,6 @@
 Base class for all data collectors.
 Handles: retry logic, sync log writing, error capture, shared HTTP client.
 """
-import asyncio
 from abc import ABC, abstractmethod
 from datetime import datetime, timezone
 from typing import Optional

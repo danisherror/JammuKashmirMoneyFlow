@@ -3,7 +3,6 @@ PM Awas Yojana (Rural) Collector for J&K
 Source: pmayg.nic.in
 Updates: Weekly
 """
-import time
 import random
 from datetime import date
 from loguru import logger

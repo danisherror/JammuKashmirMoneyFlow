@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, desc
 
 from database.connection import get_db
-from database.models import Tender, Department
+from database.models import Tender
 from api.schemas import TenderSummary, ContractorLeaderboardItem
 
 router = APIRouter(prefix="/tenders", tags=["Tenders"])
@@ -64,7 +64,7 @@ async def contractor_leaderboard(
             func.sum(Tender.awarded_cost).label("total_awarded"),
         )
         .where(Tender.status == "awarded")
-        .where(Tender.contractor_name != None)
+        .where(Tender.contractor_name.isnot(None))
         .group_by(Tender.contractor_name)
         .order_by(desc("total_awarded"))
         .limit(limit)

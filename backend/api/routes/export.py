@@ -238,7 +238,7 @@ async def export_gap_analysis(
 ):
     """Download department-level fund gap analysis as CSV."""
     from sqlalchemy import and_, func as sqlfunc
-    from database.models import Department, BudgetAllocation, Expenditure, Scheme, SchemeProgress
+    from database.models import Department, Scheme, SchemeProgress
 
     rows = (await db.execute(
         select(Department, BudgetAllocation)
@@ -246,7 +246,7 @@ async def export_gap_analysis(
             BudgetAllocation.department_id == Department.id,
             BudgetAllocation.financial_year == financial_year,
         ))
-        .where(Department.is_active == True)
+        .where(Department.is_active.is_(True))
     )).all()
 
     exp_rows = (await db.execute(

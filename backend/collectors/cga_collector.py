@@ -62,7 +62,7 @@ class CGACollector(BaseCollector):
             select(Department, BudgetAllocation)
             .join(BudgetAllocation, BudgetAllocation.department_id == Department.id)
             .where(
-                Department.is_active == True,
+                Department.is_active.is_(True),
                 BudgetAllocation.financial_year == financial_year
             )
         )).all()
@@ -112,7 +112,7 @@ class CGACollector(BaseCollector):
         pdf_bytes = self._fetch_pdf()
         
         if pdf_bytes:
-            parsed_data = self._parse_pdf(pdf_bytes)
+            self._parse_pdf(pdf_bytes)  # result not stored yet; see todo.md 2.2
             # Logic to insert parsed_data into db
             pass
         else:

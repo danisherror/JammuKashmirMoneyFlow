@@ -6,10 +6,10 @@ These computed fields drive the dashboard's "money gap" analysis.
 from datetime import date
 from loguru import logger
 from sqlalchemy.orm import Session
-from sqlalchemy import select, func
+from sqlalchemy import select
 
 from database.models import (
-    SchemeProgress, BudgetAllocation, Expenditure, DBTTransfer
+    SchemeProgress, DBTTransfer
 )
 
 

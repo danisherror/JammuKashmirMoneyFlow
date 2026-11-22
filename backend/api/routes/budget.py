@@ -8,7 +8,6 @@ GET /api/v1/budget/gap-analysis
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, and_
-from loguru import logger
 
 from database.connection import get_db
 from database.models import Department, BudgetAllocation, Expenditure
@@ -29,8 +28,8 @@ async def get_budget_overview(
     result = await db.execute(
         select(
             func.sum(BudgetAllocation.budget_estimate).label("total"),
-            func.sum(BudgetAllocation.budget_estimate).filter(BudgetAllocation.is_capital == True).label("capital"),
-            func.sum(BudgetAllocation.budget_estimate).filter(BudgetAllocation.is_capital == False).label("revenue"),
+            func.sum(BudgetAllocation.budget_estimate).filter(BudgetAllocation.is_capital.is_(True)).label("capital"),
+            func.sum(BudgetAllocation.budget_estimate).filter(BudgetAllocation.is_capital.is_(False)).label("revenue"),
             func.count(BudgetAllocation.department_id.distinct()).label("dept_count"),
         ).where(BudgetAllocation.financial_year == financial_year)
     )
@@ -69,7 +68,7 @@ async def list_departments(
             BudgetAllocation.department_id == Department.id,
             BudgetAllocation.financial_year == financial_year,
         ))
-        .where(Department.is_active == True)
+        .where(Department.is_active.is_(True))
     )
 
     if division:
@@ -188,7 +187,7 @@ async def get_gap_analysis(
             BudgetAllocation.financial_year == financial_year,
         ))
         .where(
-            Department.is_active == True,
+            Department.is_active.is_(True),
             BudgetAllocation.budget_estimate >= min_allocation_lakhs,
         )
     )).all()

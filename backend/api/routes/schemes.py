@@ -6,8 +6,8 @@ GET /api/v1/schemes/{id}/history
 """
 from fastapi import APIRouter, Depends, Query, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func, and_
-from datetime import date, timedelta
+from sqlalchemy import select, func
+from datetime import date
 
 from database.connection import get_db
 from database.models import Scheme, SchemeProgress, District, Department
@@ -29,7 +29,7 @@ async def list_schemes(
         query = query.where(Scheme.scheme_type == scheme_type)
     if department_id:
         query = query.where(Scheme.department_id == department_id)
-    query = query.where(Scheme.is_active == True)
+    query = query.where(Scheme.is_active.is_(True))
 
     rows = (await db.execute(query)).all()
 

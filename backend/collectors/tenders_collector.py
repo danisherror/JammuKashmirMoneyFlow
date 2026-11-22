@@ -3,7 +3,6 @@ Tenders Collector for J&K
 Source: jktenders.gov.in
 Updates: Daily
 """
-import time
 import random
 from datetime import date, timedelta
 from loguru import logger

@@ -96,7 +96,6 @@ async def get_low_utilization_alerts(
     These represent 'dead money' — allocated but not reaching the ground.
     """
     from sqlalchemy import and_
-    from datetime import date
 
     # Get latest snapshot per scheme-district combo
     latest_subq = (

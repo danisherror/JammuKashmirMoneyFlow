@@ -7,14 +7,12 @@ Uses the Gemini API to parse raw audit paragraphs into structured findings.
 Falls back to simulation if GEMINI_API_KEY is not configured.
 """
 import json
-import random
-from datetime import datetime, timezone
 from loguru import logger
 from sqlalchemy.orm import Session
 from sqlalchemy import select
 
 from collectors.base_collector import BaseCollector
-from database.models import CAGFinding, CAGSeverity, Department
+from database.models import CAGFinding, CAGSeverity
 from config import get_settings
 
 settings = get_settings()

@@ -16,10 +16,14 @@ router = APIRouter(prefix="/districts", tags=["Districts"])
 
 
 def _absorption_grade(score: float) -> str:
-    if score >= 80: return "A"
-    if score >= 60: return "B"
-    if score >= 40: return "C"
-    if score >= 20: return "D"
+    if score >= 80:
+        return "A"
+    if score >= 60:
+        return "B"
+    if score >= 40:
+        return "C"
+    if score >= 20:
+        return "D"
     return "F"
 
 
@@ -89,7 +93,7 @@ async def get_district_detail(
     if not district:
         raise HTTPException(status_code=404, detail="District not found")
 
-    from database.models import Scheme, Department
+    from database.models import Scheme
     from api.schemas import SchemeDistrictProgress
 
     # Use a subquery to find the latest snapshot date for each scheme in this district

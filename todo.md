@@ -33,10 +33,10 @@ Work through the phases in order. Each phase lists the score it should unlock. A
 
 ### 0.3 Minimal CI from day one
 Phases 1–3 are heavy refactors. Without CI, regressions go unnoticed until Phase 4.
-- [ ] Add `.github/workflows/ci.yml` running `ruff check backend`, `npm run build` (includes `tsc`) and `docker-compose build` on every push and PR.
+- [x] Add `.github/workflows/ci.yml` running `ruff check backend`, `npm run build` (includes `tsc`) and `docker-compose build` on every push and PR. (Ruff is pinned in `backend/requirements-dev.txt`, configured in `backend/ruff.toml`; the existing 36 findings were fixed.)
 - [ ] Add each new check (pytest, vitest, mypy, e2e) to this workflow as soon as the phase that introduces it lands. Phase 4.3 then only finishes and gates it.
 
-**Done when:** a PR that breaks the frontend build shows a red check on GitHub.
+**Done when:** a PR that breaks the frontend build shows a red check on GitHub. ⏳ Workflow added 2026-11-22 and all three checks pass locally; not yet confirmed on GitHub (needs a push and a test PR).
 
 ---
 

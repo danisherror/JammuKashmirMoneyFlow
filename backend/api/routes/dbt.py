@@ -3,7 +3,7 @@ DBT API Routes
 GET /api/v1/dbt/schemes
 GET /api/v1/dbt/schemes/{id}/gap
 """
-from fastapi import APIRouter, Depends, Query, HTTPException
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, desc
 
