@@ -60,6 +60,31 @@ export interface Sourced {
 
 // ── Budget ────────────────────────────────────────────────────────────────────
 
+/**
+ * How a year's audited grant became spending (CAG Appropriation Accounts, ₹ lakhs):
+ * original + supplementary (+ re-appropriation) = final grant; final grant − gross expenditure =
+ * saving − excess; gross expenditure − recoveries = net expenditure. The original grant is what was
+ * passed with the budget; it is not called a Budget Estimate because that hasn't been checked
+ * against the J&K budget documents.
+ */
+export interface OfficialChain {
+  financial_year: string
+  grants: number[]
+  original_lakhs: number
+  supplementary_lakhs: number
+  reappropriation_lakhs: number
+  final_grant_lakhs: number
+  surrendered_lakhs: number
+  gross_expenditure_lakhs: number
+  saving_lakhs: number
+  excess_lakhs: number
+  /** null when Appendix II isn't loaded for the year. */
+  recoveries_lakhs: number | null
+  recoveries_estimate_lakhs: number | null
+  net_expenditure_lakhs: number | null
+  sources: Record<string, FigureSource>
+}
+
 export interface BudgetOverview extends Sourced {
   financial_year: string
   total_budget_lakhs: number | null
@@ -70,6 +95,8 @@ export interface BudgetOverview extends Sourced {
   /** Official figures: number of CAG grants. */
   total_departments: number
   data_as_of: ISODate | null
+  /** Every grant; null in the live view or for a year without CAG accounts. */
+  official_chain: OfficialChain | null
 }
 
 export interface DepartmentSummary extends Sourced {
@@ -98,6 +125,8 @@ export interface DepartmentDetail extends DepartmentSummary {
   monthly_expenditure: MonthlyExpenditure[]
   schemes: Record<string, unknown>[]
   year_over_year: { current: number; previous: number; change_pct: number | null } | null
+  /** The department's mapped grants; null in the live view, without a mapped grant or CAG accounts. */
+  official_chain: OfficialChain | null
 }
 
 export type GapFlag = 'critical' | 'warning' | 'on_track' | 'no_data'

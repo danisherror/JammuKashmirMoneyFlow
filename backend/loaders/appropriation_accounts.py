@@ -1,14 +1,16 @@
 """
 Load the J&K Appropriation Accounts (CAG) into the database.
 
-Tables filled from one PDF: `appropriation_account_lines` (summary table) and, from the grant
+Tables filled from one PDF: `appropriation_account_lines` (summary table); from the grant
 pages, `appropriation_major_heads`, `appropriation_section_blocks`, `appropriation_notes`,
-`appropriation_head_lines` and `appropriation_document_issues`.
+`appropriation_head_lines` and `appropriation_document_issues`; and from Appendix II,
+`appropriation_recoveries`.
 
 Steps, all-or-nothing per document:
   1. download the PDF (or read a local copy),
   2. parse and validate it (parsers.appropriation_accounts for the summary, then
-     parsers.appropriation_details for the grant pages) — a document that fails is never stored,
+     parsers.appropriation_details for the grant pages, parsers.appropriation_recoveries for
+     Appendix II) — a document that fails is never stored,
   3. save the bytes to <raw_snapshot_dir>/appropriation_accounts/<sha256>.pdf,
   4. in one transaction, record the snapshot and replace that year's rows in every table.
 
@@ -37,11 +39,13 @@ from database.models import (
     AppropriationHeadLine,
     AppropriationMajorHead,
     AppropriationNote,
+    AppropriationRecovery,
     AppropriationSectionBlock,
     SourceSnapshot,
 )
 from parsers.appropriation_accounts import parse_appropriation_summary
 from parsers.appropriation_details import AppropriationDetails, parse_appropriation_details
+from parsers.appropriation_recoveries import AppropriationRecoveries, parse_appropriation_recoveries
 
 SOURCE_TYPE = "appropriation_accounts"
 
@@ -74,6 +78,7 @@ YEAR_TABLES = (
     AppropriationNote,
     AppropriationHeadLine,
     AppropriationDocumentIssue,
+    AppropriationRecovery,
 )
 
 
@@ -108,6 +113,7 @@ def load_appropriation_accounts(
     if expected_year and year != expected_year:
         raise ValueError(f"expected the {expected_year} accounts, but the PDF is for {year}")
     details = parse_appropriation_details(io.BytesIO(pdf_bytes), summary=summary, partial=partial_details)
+    recoveries = parse_appropriation_recoveries(io.BytesIO(pdf_bytes), summary=summary)
 
     sha256 = hashlib.sha256(pdf_bytes).hexdigest()
     relative_path = Path(SOURCE_TYPE) / f"{sha256}.pdf"
@@ -140,7 +146,12 @@ def load_appropriation_accounts(
             table: set(db.execute(select(table.snapshot_id).where(table.financial_year == year)).scalars())
             for table in YEAR_TABLES
         }
-        expected_tables = {AppropriationAccountLine, AppropriationMajorHead, AppropriationSectionBlock}
+        expected_tables = {
+            AppropriationAccountLine,
+            AppropriationMajorHead,
+            AppropriationSectionBlock,
+            AppropriationRecovery,
+        }
         if details.notes:
             expected_tables.add(AppropriationNote)
         if details.heads:
@@ -171,11 +182,29 @@ def load_appropriation_accounts(
             for line in summary.lines
         )
         db.add_all(_detail_rows(details, snapshot.id))
+        db.add_all(_recovery_rows(recoveries, snapshot.id))
         db.commit()
         return LoadResult(year, snapshot.id, sha256, status, len(summary.lines), len(details.heads))
     except Exception:
         db.rollback()
         raise
+
+
+def _recovery_rows(recoveries: AppropriationRecoveries, snapshot_id: int) -> list[AppropriationRecovery]:
+    return [
+        AppropriationRecovery(
+            snapshot_id=snapshot_id,
+            financial_year=recoveries.financial_year,
+            grant_no=line.grant_no,
+            grant_name_raw=line.grant_name,
+            section=line.section,
+            budget_estimate_thousand=line.budget_estimate,
+            actual_thousand=line.actual,
+            page=line.page,
+            actuals_page=line.actuals_page,
+        )
+        for line in recoveries.lines
+    ]
 
 
 def _detail_rows(details: AppropriationDetails, snapshot_id: int) -> list:

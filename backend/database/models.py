@@ -431,6 +431,29 @@ class AppropriationDocumentIssue(Base):
     text = Column(Text, nullable=False)
 
 
+class AppropriationRecovery(Base):
+    """
+    Appendix II: recoveries adjusted in reduction of expenditure, per grant and section (₹ thousand).
+    Not the Budget Estimate of expenditure: these are deducted from gross expenditure to get net
+    expenditure (see parsers.appropriation_recoveries). Nil is stored as 0, as printed ("-").
+    """
+    __tablename__ = "appropriation_recoveries"
+    __table_args__ = (
+        UniqueConstraint("financial_year", "grant_no", "section", name="uq_appropriation_recovery"),
+    )
+
+    id = Column(Integer, primary_key=True)
+    snapshot_id = Column(Integer, ForeignKey("source_snapshots.id"), index=True, nullable=False)
+    financial_year = Column(String(10), index=True, nullable=False)
+    grant_no = Column(Integer, nullable=False)
+    grant_name_raw = Column(String(300), nullable=False)
+    section = Column(String(10), nullable=False)
+    budget_estimate_thousand = Column(BigInteger, nullable=False)  # estimate of recoveries
+    actual_thousand = Column(BigInteger, nullable=False)
+    page = Column(Integer, nullable=False)                         # page with the grant name
+    actuals_page = Column(Integer, nullable=False)
+
+
 class GrantDepartmentMap(Base):
     """Which tracker department a numbered grant belongs to, per financial year."""
     __tablename__ = "grant_department_map"

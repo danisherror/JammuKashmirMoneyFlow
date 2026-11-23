@@ -27,3 +27,18 @@ grants were picked for the layout quirks they show (see `parsers/appropriation_d
 | `jk-appropriation-2021-22-grants.pdf` | 28–33, 40–43, 59, 142–146, 158–160 | 2, 6, 9, 28, 34 | doubled bold glyphs, "Supplementary/ Re-appropriation", major-head name wrapped onto "Voted", non-head table (works establishment charges), withdrawn charged block, footnote in a table, missing "O" label, revenue head printed under "Capital Section" |
 | `jk-appropriation-2022-23-grants.pdf` | 30–35, 41–44, 149–152 | 2, 5, 6, 32, 33 | "R" amount on the line below its label, grant with no amounts (Mining), shifted page margin, printed arithmetic error (grant 32), note numbers skipping 6 |
 | `jk-appropriation-2023-24-grants.pdf` | 19–30, 117–119, 137–138, 147–148 | 1, 2, 24, 31, 36 | every note-table type, branch printed with no row, table printed without a header, "Capital Section" heading in the section block, block without a "Voted" label |
+
+## Appendix II (recoveries) fixtures
+
+`jk-appropriation-<year>-recoveries.pdf` hold, cut the same way from the same original PDFs
+(SHA-256 above) on 2026-11-23: first the reconciliation page at the end of the summary ("Deduct
+Recoveries shown in Appendix-II"), then the Appendix II pages ("Grant-wise details of estimates and
+actuals in respect of recoveries adjusted in the accounts in reduction of expenditure"), left and
+right pages in pairs. `tests/pdf_fixtures.py` merges them with the summary and grant-page fixtures in
+the original's page order for the loader and route tests.
+
+| Fixture | PDF pages of original | Quirks covered |
+|---|---|---|
+| `jk-appropriation-2021-22-recoveries.pdf` | 16, 168–169 | blank nil cells instead of "-" (grant 15 and Total, Revenue); grant name printed truncated ("Food, Civil Supplies and Consumer") |
+| `jk-appropriation-2022-23-recoveries.pdf` | 17, 162–163 | amounts printed between the two lines of a wrapped grant name |
+| `jk-appropriation-2023-24-recoveries.pdf` | 14, 152–155 | every grant listed, two spreads |

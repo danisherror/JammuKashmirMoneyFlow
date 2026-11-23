@@ -23,6 +23,7 @@ from api.figures import (
     pct,
     to_source,
 )
+from api.official import department_grants, official_chain
 from api.schemas import (
     BudgetOverview,
     DepartmentDetail,
@@ -91,6 +92,7 @@ async def get_budget_overview(
         revenue_pct=pct(revenue.value, total.value),
         total_departments=departments,
         data_as_of=as_of(total, capital, revenue),
+        official_chain=await official_chain(db, financial_year) if view is not View.LIVE else None,
         view=view,
         sources={
             "total_budget_lakhs": to_source(total),
@@ -154,7 +156,10 @@ async def get_department_detail(
     view: View = VIEW_QUERY,
     db: AsyncSession = Depends(get_db),
 ):
-    """Single department: totals in the chosen view, plus the live monthly expenditure trend."""
+    """
+    Single department: totals in the chosen view, the live monthly expenditure trend, and (official
+    and combined views) the audited original → final grant → spent chain of its mapped grants.
+    """
     dept = await db.get(Department, dept_id)
     if not dept:
         raise HTTPException(status_code=404, detail="Department not found")
@@ -189,10 +194,16 @@ async def get_department_detail(
         else:
             monthly_source = FigureSource(source_type=None, label=f"No monthly spending figure for {financial_year}")
 
+    chain = None
+    if view is not View.LIVE:
+        grants = await department_grants(db, financial_year, dept_id)
+        chain = await official_chain(db, financial_year, grants) if grants else None
+
     return DepartmentDetail(
         **base.model_dump(exclude={"sources"}),
         sources={**base.sources, "monthly_expenditure": monthly_source},
         monthly_expenditure=monthly,
+        official_chain=chain,
     )
 
 

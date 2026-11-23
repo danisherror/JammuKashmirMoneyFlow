@@ -9,6 +9,7 @@ import { fmtLakhs, fmtPct, utilColor, divisionLabel } from '../lib/utils'
 import { fieldHeading } from '../lib/sources'
 import UtilBar from '../components/UtilBar'
 import SourceBadge from '../components/SourceBadge'
+import OfficialChainPanel from '../components/OfficialChainPanel'
 import PageHeader from '../components/PageHeader'
 import ErrorBox from '../components/ErrorBox'
 import { ChevronLeft } from 'lucide-react'
@@ -75,6 +76,13 @@ export default function DepartmentDetail() {
                 )
               })}
             </div>
+
+            {data.official_chain && (
+              <OfficialChainPanel
+                chain={data.official_chain}
+                scope={`Grant${data.official_chain.grants.length > 1 ? 's' : ''} ${data.official_chain.grants.join(', ')}`}
+              />
+            )}
 
             {/* Utilization bar */}
             <div className="panel">

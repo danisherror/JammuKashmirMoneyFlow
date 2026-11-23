@@ -13,6 +13,7 @@ import { fmtLakhs, fmtPct, utilColor } from '../lib/utils'
 import { VIEWS, sourceKind, type SourceKind } from '../lib/sources'
 import type { DepartmentSummary, View } from '../lib/api'
 import SourceBadge from '../components/SourceBadge'
+import OfficialChainPanel from '../components/OfficialChainPanel'
 import KpiCard from '../components/KpiCard'
 import UtilBar from '../components/UtilBar'
 import PageHeader from '../components/PageHeader'
@@ -115,6 +116,11 @@ export default function Overview() {
               value={overview.total_budget_lakhs == null ? null : overview.total_departments} direction="neutral"
               sub={`FY ${financialYear}`} />
           </div>
+        )}
+
+        {overview?.official_chain && (
+          <OfficialChainPanel chain={overview.official_chain}
+            scope={`All ${overview.official_chain.grants.length} grants`} />
         )}
 
         {/* Alert summary strip */}

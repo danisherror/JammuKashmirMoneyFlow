@@ -58,6 +58,32 @@ class Sourced(BaseModel):
 
 # ── Budget ────────────────────────────────────────────────────────────────────
 
+class OfficialChain(BaseModel):
+    """
+    How a year's audited grant became spending, from the CAG Appropriation Accounts (₹ lakhs):
+    original + supplementary (+ re-appropriation, 2021-22 only) = final grant; final grant − gross
+    expenditure = saving − excess; gross expenditure − recoveries (Appendix II) = net expenditure.
+    The original grant is the amount passed with the budget; it has not been checked against the
+    Budget Estimates in the J&K budget documents, so it is not called a Budget Estimate here.
+    """
+    financial_year: str
+    grants: list[int] = Field(description="Grant numbers summed (a department can have several)")
+    original_lakhs: float
+    supplementary_lakhs: float
+    reappropriation_lakhs: float
+    final_grant_lakhs: float
+    surrendered_lakhs: float = Field(description="Amount surrendered during the year")
+    gross_expenditure_lakhs: float
+    saving_lakhs: float
+    excess_lakhs: float
+    recoveries_lakhs: Optional[float] = Field(
+        description="Recoveries deducted from expenditure (Appendix II); null if Appendix II isn't loaded"
+    )
+    recoveries_estimate_lakhs: Optional[float] = Field(description="Budget Estimate of those recoveries")
+    net_expenditure_lakhs: Optional[float] = Field(description="Gross expenditure − recoveries")
+    sources: dict[str, FigureSource] = {}
+
+
 class BudgetOverview(Sourced):
     financial_year: str
     total_budget_lakhs: Optional[float]
@@ -67,6 +93,7 @@ class BudgetOverview(Sourced):
     revenue_pct: Optional[float]
     total_departments: int                     # official view: number of grants
     data_as_of: Optional[date]
+    official_chain: Optional[OfficialChain] = None  # every grant; null in the live view
 
     class Config:
         from_attributes = True
@@ -93,6 +120,10 @@ class DepartmentDetail(DepartmentSummary):
     monthly_expenditure: list[dict] = []       # [{month: 1, amount: 12345}, ...]
     schemes: list[dict] = []
     year_over_year: Optional[dict] = None      # {current: X, previous: Y, change_pct: Z}
+    official_chain: Optional[OfficialChain] = Field(
+        None, description="Audited original → final grant → spent chain; null in the live view or for a year "
+                          "without CAG accounts"
+    )
 
 
 class GapAnalysisItem(Sourced):

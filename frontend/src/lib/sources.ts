@@ -64,6 +64,15 @@ const MEASURE_LABELS: Record<string, string> = {
   allocated: 'Allocated',
   total_outlay: 'Total outlay',
   physical_progress_pct: 'Physical progress (%)',
+  original_grant: 'Original grant (passed with the budget)',
+  supplementary_grant: 'Supplementary grant',
+  reappropriation: 'Re-appropriation',
+  surrendered: 'Surrendered during the year',
+  saving: 'Saving (final grant not spent)',
+  excess: 'Excess over the final grant',
+  recoveries: 'Recoveries deducted from expenditure (Appendix II)',
+  recoveries_estimate: 'Budget estimate of recoveries (Appendix II)',
+  net_expenditure: 'Net expenditure (gross − recoveries)',
 }
 
 /** Plain-language name of what a figure measures, or null if the source doesn't say. */
