@@ -92,3 +92,30 @@ def test_other_errors_are_failed_and_raise(db):
     log = last_log(db)
     assert log.status is CollectorStatus.FAILED
     assert log.finished_at is not None
+
+
+@pytest.mark.parametrize(
+    "module_name, class_name",
+    [
+        ("collectors.pmay_collector", "PMAYCollector"),
+        ("collectors.pfms_collector", "PFMSCollector"),
+        ("collectors.tenders_collector", "TendersCollector"),
+        ("collectors.dbt_collector", "DBTCollector"),
+        ("collectors.cga_collector", "CGACollector"),
+        ("collectors.cag_collector", "CAGCollector"),
+    ],
+)
+def test_collectors_without_a_source_write_nothing(db, module_name, class_name):
+    """These collectors used to invent numbers when their 'live' path failed."""
+    import importlib
+
+    from database.models import CAGFinding, DBTTransfer, Expenditure, SchemeProgress, Tender
+
+    collector_class = getattr(importlib.import_module(module_name), class_name)
+    collector_class(db).run()
+
+    log = last_log(db)
+    assert log.status is CollectorStatus.NO_SOURCE
+    assert log.error_message
+    for model in (SchemeProgress, DBTTransfer, Tender, Expenditure, CAGFinding):
+        assert db.execute(select(model)).first() is None

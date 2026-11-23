@@ -55,7 +55,7 @@ In these collectors, the "live" path always throws, so the random generator alwa
 | `cga_collector.py` | `_fetch_pdf()` returns `None`, `_parse_pdf()` is a stub → "Smart Simulation" |
 | `cag_collector.py` | runs over the hardcoded `MOCK_FINDINGS` list |
 
-- [ ] Delete every `_generate_simulated_data` / `_run_fallback_simulation` / `MOCK_FINDINGS` path. Follow the honest pattern already in `jjm_collector.py` and `mgnrega_collector.py`: a failure raises and is logged to `DataSyncLog`.
+- [x] Delete every `_generate_simulated_data` / `_run_fallback_simulation` / `MOCK_FINDINGS` path. Follow the honest pattern already in `jjm_collector.py` and `mgnrega_collector.py`: a failure raises and is logged to `DataSyncLog`. Done 2026-11-23: none of the six "live" paths ever parsed anything (each loaded a page and raised, or returned `None`), so the six collectors now raise `SourceUnavailableError` and every run is logged as `no_source`, with the candidate URL marked "not yet checked" in each module docstring. The Gemini summariser in `cag_collector.py` went with the invented paragraphs; 2.3 rebuilds it. `tests/test_collector_status.py` checks that each one writes no rows. Real sources come back through 2.2 (monthly spend), 2.3 (CAG) and 2.4 (PMAY, PFMS, DBT, tenders).
 - [ ] Write a one-off migration/script that deletes rows already saved with `source` containing `simulated`/`Simulation`, or `raw_data.note == "simulated fallback"`.
 - [ ] If demo data is still wanted for local development, put it behind `DEMO_MODE=true` (default `false`). Store it with `is_demo=true` and show a red site-wide "DEMO DATA — NOT REAL" banner while it's on. The API must refuse to start with `DEMO_MODE=true` when `APP_ENV=production`.
 
