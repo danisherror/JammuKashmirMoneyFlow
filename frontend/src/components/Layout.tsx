@@ -4,7 +4,7 @@ import { useAppStore } from '../store'
 import {
   LayoutDashboard, Building2, ListChecks,
   MapPin, Bell, Database, ChevronLeft, ChevronRight, Download,
-  FileText, Wallet, Loader2
+  FileText, Wallet, Loader2, Landmark
 } from 'lucide-react'
 import clsx from 'clsx'
 import DataFreshness from './DataFreshness'
@@ -15,6 +15,7 @@ import toast, { Toaster } from 'react-hot-toast'
 const NAV = [
   { to: '/',            icon: LayoutDashboard, label: 'Overview'    },
   { to: '/departments', icon: Building2,       label: 'Departments' },
+  { to: '/grants',      icon: Landmark,        label: 'CAG Grants'  },
   { to: '/schemes',     icon: ListChecks,      label: 'Schemes'     },
   { to: '/districts',   icon: MapPin,          label: 'Districts'   },
   { to: '/tenders',     icon: FileText,        label: 'Tenders'     },

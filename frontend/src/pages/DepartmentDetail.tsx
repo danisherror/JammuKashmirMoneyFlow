@@ -4,12 +4,13 @@ import {
   AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer
 } from 'recharts'
 import { useAppStore } from '../store'
-import { fetchDepartmentDetail } from '../lib/api'
+import { fetchDepartmentBreakdown, fetchDepartmentDetail } from '../lib/api'
 import { fmtLakhs, fmtPct, utilColor, divisionLabel } from '../lib/utils'
 import { fieldHeading } from '../lib/sources'
 import UtilBar from '../components/UtilBar'
 import SourceBadge from '../components/SourceBadge'
 import OfficialChainPanel from '../components/OfficialChainPanel'
+import BreakdownSection from '../components/BreakdownSection'
 import PageHeader from '../components/PageHeader'
 import ErrorBox from '../components/ErrorBox'
 import { ChevronLeft } from 'lucide-react'
@@ -133,6 +134,13 @@ export default function DepartmentDetail() {
                 </div>
               </div>
             )}
+
+            {/* Where the audited grant went (official figures, any view) */}
+            <BreakdownSection
+              queryKey={['dept-breakdown', id]}
+              fetch={fy => fetchDepartmentBreakdown(Number(id), fy)}
+              financialYear={financialYear}
+            />
           </>
         )}
       </div>

@@ -6,6 +6,8 @@ import Layout from './components/Layout'
 const Overview = lazy(() => import('./pages/Overview'))
 const Departments = lazy(() => import('./pages/Departments'))
 const DepartmentDetail = lazy(() => import('./pages/DepartmentDetail'))
+const Grants = lazy(() => import('./pages/Grants'))
+const GrantDetail = lazy(() => import('./pages/GrantDetail'))
 const Schemes = lazy(() => import('./pages/Schemes'))
 const SchemeDetail = lazy(() => import('./pages/SchemeDetail'))
 const Districts = lazy(() => import('./pages/Districts'))
@@ -30,6 +32,8 @@ export default function App() {
           <Route index              element={<Overview />} />
           <Route path="departments" element={<Departments />} />
           <Route path="departments/:id" element={<DepartmentDetail />} />
+          <Route path="grants"      element={<Grants />} />
+          <Route path="grants/:grantNo" element={<GrantDetail />} />
           <Route path="schemes"     element={<Schemes />} />
           <Route path="schemes/:id" element={<SchemeDetail />} />
           <Route path="districts"   element={<Districts />} />

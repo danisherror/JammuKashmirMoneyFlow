@@ -129,6 +129,114 @@ export interface DepartmentDetail extends DepartmentSummary {
   official_chain: OfficialChain | null
 }
 
+// ── Grant breakdown (CAG Appropriation Accounts grant pages, todo.md 2.2b) ────
+
+export interface GrantInfo {
+  grant_no: number
+  /** Official grant name as printed in the summary table. */
+  name: string
+  /** Tracker department via grant_department_map; null when unmapped. */
+  department_id: number | null
+  final_grant_lakhs: number | null
+  gross_expenditure_lakhs: number | null
+}
+
+export interface SectionBlockItem {
+  grant_no: number
+  section: string
+  kind: string
+  original_lakhs: number
+  supplementary_lakhs: number
+  reappropriation_lakhs: number
+  final_grant_lakhs: number
+  expenditure_lakhs: number
+  saving_lakhs: number
+  excess_lakhs: number
+  surrendered_lakhs: number
+  source: FigureSource
+}
+
+export interface HeadPathPart {
+  level: 'major' | 'sub_major' | 'minor' | 'sub_head' | 'detailed'
+  code: string
+  name: string
+}
+
+export type NoteCategory =
+  | 'saving' | 'excess' | 'unutilised' | 'unutilised_supplementary' | 'without_provision' | 'comment'
+
+/** One row of a note table (₹ lakhs). Amounts the PDF doesn't print are null, not 0. */
+export interface HeadRowItem {
+  grant_no: number
+  section: string
+  kind: string
+  note_number: number
+  category: NoteCategory
+  reasons_not_communicated: boolean
+  head_code: string
+  head_name: string
+  head_path: HeadPathPart[]
+  original_lakhs: number | null
+  supplementary_lakhs: number | null
+  reappropriation_lakhs: number | null
+  final_grant_lakhs: number | null
+  expenditure_lakhs: number | null
+  saving_lakhs: number | null
+  excess_lakhs: number | null
+  /** Official remark, verbatim. */
+  remark: string
+  /** Set when the printed figures don't add up in the PDF itself. */
+  printed_error: string | null
+  source: FigureSource
+}
+
+export interface HeadNode {
+  level: HeadPathPart['level']
+  code: string
+  name: string
+  head_code: string
+  section: string
+  grant_no: number
+  /** Note rows for exactly this head. */
+  rows: HeadRowItem[]
+  children: HeadNode[]
+}
+
+export interface NoteItem {
+  grant_no: number
+  number: number
+  section: string | null
+  kind: string | null
+  category: NoteCategory
+  reasons_not_communicated: boolean
+  /** Verbatim note text. */
+  text: string
+  source: FigureSource
+}
+
+export interface DocumentIssueItem {
+  grant_no: number | null
+  kind: 'skipped_table' | 'misfiled' | 'footnote' | 'headerless_table'
+  page: number | null
+  text: string
+}
+
+/**
+ * Where a department's (or one grant's) money went. The head rows are only the heads the CAG
+ * commented on, so they don't add up to the grant total; the section blocks do.
+ */
+export interface GrantBreakdown {
+  financial_year: string
+  department_id: number | null
+  grants: GrantInfo[]
+  section_blocks: SectionBlockItem[]
+  tree: HeadNode[]
+  notes: NoteItem[]
+  issues: DocumentIssueItem[]
+  /** Why the breakdown is empty, when it is. */
+  note: string | null
+}
+
 export type GapFlag = 'critical' | 'warning' | 'on_track' | 'no_data'
 
 export interface GapAnalysisItem extends Sourced {
@@ -353,6 +461,16 @@ export const fetchDepartments = (
 
 export const fetchDepartmentDetail = (id: number, financialYear: string, view?: View) =>
   get<DepartmentDetail>(`/budget/departments/${id}`, { financial_year: financialYear, view })
+
+/** Official only, so no view. Omit the year to get the latest year with CAG grant pages loaded. */
+export const fetchDepartmentBreakdown = (id: number, financialYear?: string) =>
+  get<GrantBreakdown>(`/budget/departments/${id}/breakdown`, { financial_year: financialYear })
+
+export const fetchGrantBreakdown = (grantNo: number, financialYear?: string) =>
+  get<GrantBreakdown>(`/budget/grants/${grantNo}/breakdown`, { financial_year: financialYear })
+
+export const fetchGrants = (financialYear?: string) =>
+  get<GrantInfo[]>('/budget/grants', { financial_year: financialYear })
 
 export const fetchGapAnalysis = (financialYear: string, view?: View, minAllocationLakhs?: number) =>
   get<GapAnalysisItem[]>('/budget/gap-analysis', {
