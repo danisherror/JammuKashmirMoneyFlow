@@ -7,9 +7,11 @@ GET /api/v1/districts/{id}
 from fastapi import APIRouter, Depends, Query, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
+from sqlalchemy.orm import selectinload
 
 from database.connection import get_db
 from database.models import District, SchemeProgress
+from api.provenance import load_snapshots, snapshot_source
 from api.schemas import DistrictHeatmapItem, DistrictDetail
 
 router = APIRouter(prefix="/districts", tags=["Districts"])
@@ -49,6 +51,8 @@ async def get_district_heatmap(
         func.sum(SchemeProgress.funds_allocated).label("total_alloc"),
         func.sum(SchemeProgress.funds_utilized).label("total_util"),
         func.count(SchemeProgress.scheme_id.distinct()).label("scheme_count"),
+        func.max(SchemeProgress.snapshot_id).label("snapshot_id"),
+        func.count(SchemeProgress.snapshot_id.distinct()).label("snapshot_count"),
     ).where(
         SchemeProgress.financial_year == financial_year,
     ).group_by(SchemeProgress.district_id)
@@ -60,6 +64,7 @@ async def get_district_heatmap(
 
     agg_rows = (await db.execute(agg_query)).all()
     agg_map = {row.district_id: row for row in agg_rows}
+    snapshots = await load_snapshots(db, (row.snapshot_id for row in agg_rows))
 
     results = []
     for district in districts:
@@ -80,6 +85,7 @@ async def get_district_heatmap(
             active_schemes_count=int(agg.scheme_count or 0) if agg else 0,
             absorption_score=avg_util,
             absorption_grade=_absorption_grade(avg_util),
+            source=snapshot_source(snapshots.get(agg.snapshot_id), combined=agg.snapshot_count) if agg else None,
         ))
 
     # Highest score first; districts with no data last.
@@ -118,6 +124,7 @@ async def get_district_detail(
     # Join the subquery with SchemeProgress and Scheme to get the full row
     sp_rows = (await db.execute(
         select(SchemeProgress, Scheme)
+        .options(selectinload(SchemeProgress.snapshot), selectinload(SchemeProgress.funds_snapshot))
         .join(Scheme, SchemeProgress.scheme_id == Scheme.id)
         .join(
             subq,
@@ -149,6 +156,9 @@ async def get_district_detail(
                 snapshot_date=progress.snapshot_date,
                 scheme_name=scheme.name,
                 scheme_code=scheme.code,
+                source=snapshot_source(progress.snapshot),
+                funds_source=snapshot_source(progress.funds_snapshot,
+                                             measure="state fund totals, split by district share"),
             ))
 
     def known_sum(values):
@@ -174,5 +184,9 @@ async def get_district_detail(
         active_schemes_count=len(scheme_progress_list),
         absorption_score=avg_util,
         absorption_grade=_absorption_grade(avg_util),
+        source=snapshot_source(
+            max((p.snapshot for p, _ in sp_rows if p.snapshot), key=lambda s: s.id, default=None),
+            combined=len({p.snapshot_id for p, _ in sp_rows if p.snapshot_id is not None}),
+        ),
         scheme_progress=scheme_progress_list,
     )

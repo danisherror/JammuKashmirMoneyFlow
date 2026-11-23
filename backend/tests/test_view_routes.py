@@ -29,6 +29,7 @@ from database.models import (
 )
 from loaders.appropriation_accounts import load_appropriation_accounts
 from tests.pdf_fixtures import accounts_pdf
+from tests.provenance_helpers import make_snapshot
 
 URL = "https://cag.gov.in/example-2022-23.pdf"
 FETCHED = datetime(2026, 11, 22, tzinfo=timezone.utc)
@@ -60,6 +61,7 @@ def setup(tmp_path):
         ulb = Department(name="Urban Local Bodies", code="ULB", division=DivisionType.CENTRAL)
         db.add_all([pwd, health, ulb])
         db.flush()
+        live = make_snapshot(db, "live_budget")
         db.add_all([
             GrantDepartmentMap(financial_year=YEAR, grant_no=16, department_id=pwd.id),
             GrantDepartmentMap(financial_year=YEAR, grant_no=17, department_id=health.id),
@@ -70,18 +72,18 @@ def setup(tmp_path):
         db.add_all([
             # within 2% of the audited final grant -> no flag
             BudgetAllocation(department_id=pwd.id, financial_year=YEAR, budget_estimate=int(pwd_grant * 1.01),
-                             is_capital=True, source="jkfinance.nic.in"),
+                             is_capital=True, source="jkfinance.nic.in", snapshot_id=live.id),
             # far from the audited figure -> flag
             BudgetAllocation(department_id=health.id, financial_year=YEAR, budget_estimate=1000,
-                             is_capital=False, source="jkfinance.nic.in"),
+                             is_capital=False, source="jkfinance.nic.in", snapshot_id=live.id),
             # no grant mapped -> live only
             BudgetAllocation(department_id=ulb.id, financial_year=YEAR, budget_estimate=50000,
-                             is_capital=True, source="jkfinance.nic.in"),
+                             is_capital=True, source="jkfinance.nic.in", snapshot_id=live.id),
             # a year the CAG hasn't published
             BudgetAllocation(department_id=pwd.id, financial_year="2024-25", budget_estimate=400000,
-                             is_capital=True, source="jkfinance.nic.in"),
+                             is_capital=True, source="jkfinance.nic.in", snapshot_id=live.id),
             Expenditure(department_id=pwd.id, financial_year=YEAR, month=1, utilized_amount=int(pwd_spent / 2),
-                        source="cga.nic.in", snapshot_date=date(2022, 5, 1)),
+                        source="cga.nic.in", snapshot_date=date(2022, 5, 1), snapshot_id=live.id),
         ])
 
         district = District(name="Jammu", code="JMU", division=DivisionType.JAMMU)
@@ -93,7 +95,8 @@ def setup(tmp_path):
         db.flush()
         db.add(SchemeProgress(scheme_id=jjm.id, district_id=district.id, financial_year=YEAR,
                               funds_allocated=200, funds_utilized=50, funds_released=None,
-                              snapshot_date=date(2023, 1, 1), source="ejalshakti.gov.in"))
+                              snapshot_date=date(2023, 1, 1), source="ejalshakti.gov.in",
+                              snapshot_id=live.id))
         db.commit()
         ids = {"PWD": pwd.id, "HEALTH": health.id, "ULB": ulb.id, "JJM": jjm.id}
         expected = {
@@ -102,7 +105,8 @@ def setup(tmp_path):
             "health_grant": official_lakhs(db, AppropriationAccountLine.final_grant_thousand, 17),
             "total": official_lakhs(db, AppropriationAccountLine.final_grant_thousand),
             "capital": official_lakhs(db, AppropriationAccountLine.final_grant_thousand, section="capital"),
-            "snapshot_id": db.scalar(select(SourceSnapshot.id)),
+            "snapshot_id": db.scalar(select(SourceSnapshot.id).where(SourceSnapshot.source_type == "appropriation_accounts")),
+            "live_snapshot_id": live.id,
             "grants": db.scalar(select(func.count(AppropriationAccountLine.grant_no.distinct()))),
             "pwd_page": db.scalar(select(func.min(AppropriationAccountLine.page))
                                   .where(AppropriationAccountLine.grant_no == 16)),
@@ -165,6 +169,7 @@ def test_overview_live_and_missing_year(setup):
     assert missing["sources"]["total_budget_lakhs"] == {
         "source_type": None, "label": "No budget figure for 2019-20", "measure": None, "source_url": None,
         "snapshot_id": None, "page": None, "fetched_at": None, "provisional": False, "mismatch": None,
+        "download_url": None,
     }
 
 
@@ -254,12 +259,16 @@ def test_unknown_view_is_rejected(setup):
 # ── schemes ───────────────────────────────────────────────────────────────────
 
 def test_schemes_are_live_only(setup):
-    client, ids, _ = setup
+    client, ids, expected = setup
     combined = get(client, "/schemes", financial_year=YEAR)[0]
     assert combined["funds_allocated_lakhs"] == 200
     assert combined["funds_released_lakhs"] is None
     src = combined["sources"]["funds_utilized_lakhs"]
-    assert (src["source_type"], src["provisional"], src["source_url"]) == ("live", True, "https://ejalshakti.gov.in/")
+    assert (src["source_type"], src["provisional"]) == ("live", True)
+    # the live figure points at the saved document it was read from (todo.md 1.4)
+    assert src["snapshot_id"] == expected["live_snapshot_id"]
+    assert src["source_url"] == "https://example.gov.in/live_budget"
+    assert src["download_url"] == f"/api/v1/snapshots/{expected['live_snapshot_id']}"
 
     official = get(client, "/schemes", financial_year=YEAR, view="official")[0]
     assert official["funds_allocated_lakhs"] is None

@@ -182,7 +182,7 @@ export default function SchemeDetail() {
                   <table className="w-full">
                     <thead>
                       <tr className="border-b" style={{ borderColor: '#1a2a3a' }}>
-                        {['DISTRICT', 'DIV', 'TARGET', 'ACHIEVED', 'PHYS%', 'ALLOCATED', 'RELEASED', 'UTILIZED', 'UTIL%'].map(h => (
+                        {['DISTRICT', 'DIV', 'TARGET', 'ACHIEVED', 'PHYS%', 'ALLOCATED', 'RELEASED', 'UTILIZED', 'UTIL%', 'SOURCE'].map(h => (
                           <th key={h} className="mono text-[8px] text-dim text-left pb-2 pr-4 tracking-widest">{h}</th>
                         ))}
                       </tr>
@@ -203,10 +203,15 @@ export default function SchemeDetail() {
                             {d.funds_released_lakhs != null ? fmtLakhs(d.funds_released_lakhs) : <span className="text-dim">—</span>}
                           </td>
                           <td className="pr-4 mono text-[9px] text-green">{fmtLakhs(d.funds_utilized_lakhs)}</td>
-                          <td>
+                          <td className="pr-4">
                             <span className={`mono text-[9px] ${utilColor(d.utilization_pct)}`}>
                               {fmtPct(d.utilization_pct)}
                             </span>
+                          </td>
+                          {/* This row's own saved document (todo.md 1.4); funds may come from a second one */}
+                          <td className="whitespace-nowrap">
+                            <SourceBadge source={d.source} />
+                            {d.funds_source && <SourceBadge source={d.funds_source} className="ml-1" />}
                           </td>
                         </tr>
                       ))}

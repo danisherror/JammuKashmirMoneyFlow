@@ -2,7 +2,7 @@
 Pydantic schemas for all API request/response models.
 These define exactly what the frontend receives from every endpoint.
 """
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, computed_field
 from typing import Literal, Optional
 from datetime import date, datetime
 from enum import Enum
@@ -68,6 +68,11 @@ class FigureSource(BaseModel):
     fetched_at: Optional[datetime] = None
     provisional: bool = False
     mismatch: Optional[MismatchInfo] = None
+
+    @computed_field(description="Path of the saved source file (GET /api/v1/snapshots/{id}); null without a snapshot")
+    @property
+    def download_url(self) -> Optional[str]:
+        return f"/api/v1/snapshots/{self.snapshot_id}" if self.snapshot_id is not None else None
 
 
 class SnapshotInfo(BaseModel):
@@ -153,6 +158,9 @@ class DepartmentSummary(Sourced):
 class MonthlyExpenditure(BaseModel):
     month: int = Field(description="Calendar month, 1-12")
     amount_lakhs: Optional[float] = Field(description="₹ lakhs")
+    source: Optional[FigureSource] = Field(
+        None, description="Most recently saved source document among the rows added up here"
+    )
 
 
 class YearOverYear(BaseModel):
@@ -344,6 +352,12 @@ class SchemeDistrictProgress(BaseModel):
     snapshot_date: Optional[date]
     scheme_name: Optional[str] = None           # populated in district detail view
     scheme_code: Optional[str] = None
+    source: Optional[FigureSource] = Field(
+        None, description="Saved source document this row was read from (source URL, fetch time, download link)"
+    )
+    funds_source: Optional[FigureSource] = Field(
+        None, description="Separate document the fund figures came from (JJM/MGNREGA state fund statement), if any"
+    )
 
     class Config:
         from_attributes = True
@@ -408,6 +422,9 @@ class DistrictHeatmapItem(BaseModel):
     # For map coloring
     absorption_score: Optional[float]         # 0-100 normalized score
     absorption_grade: Optional[AbsorptionGrade] = Field(description="null when the district has no data")
+    source: Optional[FigureSource] = Field(
+        None, description="Most recently saved source document among the rows added up here"
+    )
 
     class Config:
         from_attributes = True
@@ -460,6 +477,9 @@ class CAGFindingItem(BaseModel):
     severity: Optional[Literal["high", "medium", "low"]]
     paragraph_ref: Optional[str]
     source_pdf_url: Optional[str]
+    source: Optional[FigureSource] = Field(
+        None, description="Saved source document this row was read from (source URL, fetch time, download link)"
+    )
 
 
 class LowUtilizationAlert(BaseModel):
@@ -472,6 +492,9 @@ class LowUtilizationAlert(BaseModel):
     utilization_pct: float
     severity: Literal["critical", "warning"] = Field(description="critical below 20%, warning below 40%")
     snapshot_date: date
+    source: Optional[FigureSource] = Field(
+        None, description="Saved source document this row was read from (source URL, fetch time, download link)"
+    )
 
     class Config:
         from_attributes = True
@@ -490,6 +513,9 @@ class TenderSummary(BaseModel):
     status: Optional[str]
     published_date: Optional[date]
     award_date: Optional[date]
+    source: Optional[FigureSource] = Field(
+        None, description="Saved source document this row was read from (source URL, fetch time, download link)"
+    )
 
     class Config:
         from_attributes = True
@@ -499,6 +525,9 @@ class ContractorLeaderboardItem(BaseModel):
     contractor_name: str
     total_tenders_won: int
     total_awarded_lakhs: Optional[int] = Field(description="₹ lakhs; null when no awarded amount is known")
+    source: Optional[FigureSource] = Field(
+        None, description="Most recently saved source document among the rows added up here"
+    )
 
 
 # ── DBT ───────────────────────────────────────────────────────────────────────
@@ -513,6 +542,9 @@ class DBTSchemeSummary(BaseModel):
     total_beneficiaries_paid: Optional[int]
     total_amount_transferred_lakhs: Optional[int]
     overall_gap_pct: Optional[float] = Field(description="null when enrolled or paid is unknown")
+    source: Optional[FigureSource] = Field(
+        None, description="Most recently saved source document among the rows added up here"
+    )
 
 
 class DBTDistrictGap(BaseModel):
@@ -523,6 +555,9 @@ class DBTDistrictGap(BaseModel):
     beneficiaries_paid: Optional[int]
     amount_transferred_lakhs: Optional[int]
     last_mile_gap_pct: Optional[float]
+    source: Optional[FigureSource] = Field(
+        None, description="Saved source document this row was read from (source URL, fetch time, download link)"
+    )
 
     class Config:
         from_attributes = True

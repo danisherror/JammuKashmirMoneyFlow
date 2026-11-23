@@ -118,9 +118,12 @@ class BudgetAllocation(Base):
     source = Column(String(100), default="jkfinance.nic.in")
     # Made-up row from database/demo_data.py (DEMO_MODE=true). Deleted on startup when demo mode is off.
     is_demo = Column(Boolean, nullable=False, default=False, server_default=false(), index=True)
+    # The saved source document this row was read from (todo.md 1.4). Required: no fact row without one.
+    snapshot_id = Column(Integer, ForeignKey("source_snapshots.id"), index=True, nullable=False)
     last_updated = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
     department = relationship("Department", back_populates="allocations")
+    snapshot = relationship("SourceSnapshot")
 
 
 class Expenditure(Base):
@@ -140,9 +143,12 @@ class Expenditure(Base):
     is_capital = Column(Boolean, default=False)
     source = Column(String(100), default="cga.nic.in")
     snapshot_date = Column(Date, index=True, nullable=False)
+    # The saved source document this row was read from (todo.md 1.4). Required: no fact row without one.
+    snapshot_id = Column(Integer, ForeignKey("source_snapshots.id"), index=True, nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     department = relationship("Department", back_populates="expenditures")
+    snapshot = relationship("SourceSnapshot")
 
 
 # ── Scheme Progress ───────────────────────────────────────────────────────────
@@ -178,10 +184,16 @@ class SchemeProgress(Base):
     snapshot_date = Column(Date, index=True, nullable=False)
     source = Column(String(100), nullable=True)
     raw_data = Column(JSON, nullable=True)                   # original API response
+    # The saved source document this row was read from (todo.md 1.4). Required: no fact row without one.
+    snapshot_id = Column(Integer, ForeignKey("source_snapshots.id"), index=True, nullable=False)
+    # JJM/MGNREGA read district figures and state fund totals from two documents; this is the fund one.
+    funds_snapshot_id = Column(Integer, ForeignKey("source_snapshots.id"), index=True, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     scheme = relationship("Scheme", back_populates="progress")
     district = relationship("District", back_populates="scheme_progress")
+    snapshot = relationship("SourceSnapshot", foreign_keys=[snapshot_id])
+    funds_snapshot = relationship("SourceSnapshot", foreign_keys=[funds_snapshot_id])
 
 
 # ── Tenders ───────────────────────────────────────────────────────────────────
@@ -211,8 +223,11 @@ class Tender(Base):
     source_url = Column(String(500), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+    # The saved source document this row was read from (todo.md 1.4). Required: no fact row without one.
+    snapshot_id = Column(Integer, ForeignKey("source_snapshots.id"), index=True, nullable=False)
 
     department = relationship("Department", back_populates="tenders")
+    snapshot = relationship("SourceSnapshot")
 
 
 # ── DBT Transfers ─────────────────────────────────────────────────────────────
@@ -240,10 +255,13 @@ class DBTTransfer(Base):
 
     snapshot_date = Column(Date, index=True, nullable=False)
     source = Column(String(100), default="dbtbharat.gov.in")
+    # The saved source document this row was read from (todo.md 1.4). Required: no fact row without one.
+    snapshot_id = Column(Integer, ForeignKey("source_snapshots.id"), index=True, nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     scheme = relationship("Scheme", back_populates="dbt_transfers")
     district = relationship("District", back_populates="dbt_transfers")
+    snapshot = relationship("SourceSnapshot")
 
 
 # ── CAG Findings ──────────────────────────────────────────────────────────────
@@ -270,6 +288,10 @@ class CAGFinding(Base):
     page_number = Column(Integer, nullable=True)
     source_pdf_url = Column(String(500), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
+    # The saved source document this row was read from (todo.md 1.4). Required: no fact row without one.
+    snapshot_id = Column(Integer, ForeignKey("source_snapshots.id"), index=True, nullable=False)
+
+    snapshot = relationship("SourceSnapshot")
 
 
 # ── Official documents (PDF) ──────────────────────────────────────────────────

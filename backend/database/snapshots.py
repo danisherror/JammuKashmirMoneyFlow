@@ -20,6 +20,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import Session
 
 from database.models import SourceSnapshot
@@ -98,6 +99,40 @@ def save_snapshot(
         )
         db.add(snapshot)
         db.flush()
+    return snapshot
+
+
+async def save_snapshot_async(
+    db: AsyncSession,
+    content: bytes,
+    *,
+    source_url: str,
+    source_type: str,
+    content_type: str | None,
+    collector_name: str | None = None,
+    title: str | None = None,
+    fetched_at: datetime | None = None,
+    snapshot_dir: str | Path | None = None,
+) -> SourceSnapshot:
+    """save_snapshot for an AsyncSession (startup seeding)."""
+    sha256, relative = write_snapshot_file(content, source_type, content_type, snapshot_dir)
+    snapshot = (await db.execute(
+        select(SourceSnapshot).where(SourceSnapshot.sha256 == sha256)
+    )).scalar_one_or_none()
+    if snapshot is None:
+        snapshot = SourceSnapshot(
+            source_type=source_type,
+            collector_name=collector_name,
+            title=title,
+            source_url=source_url,
+            sha256=sha256,
+            storage_path=relative,
+            content_type=content_type,
+            byte_size=len(content),
+            fetched_at=fetched_at or datetime.now(timezone.utc),
+        )
+        db.add(snapshot)
+        await db.flush()
     return snapshot
 
 

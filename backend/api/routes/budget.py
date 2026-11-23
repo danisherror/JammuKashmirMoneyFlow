@@ -26,6 +26,7 @@ from api.figures import (
     pct,
     to_source,
 )
+from api.provenance import load_snapshots, newest_id, snapshot_source
 from api.official import department_grants, grant_breakdown, latest_detail_year, list_grants, official_chain
 from api.schemas import (
     BudgetOverview,
@@ -182,18 +183,27 @@ async def get_department_detail(
                 func.sum(Expenditure.utilized_amount).label("amount"),
                 func.max(Expenditure.source).label("source"),
                 func.max(Expenditure.created_at).label("updated"),
+                func.max(Expenditure.snapshot_id).label("snapshot_id"),
             )
             .where(Expenditure.department_id == dept_id, Expenditure.financial_year == financial_year)
             .group_by(Expenditure.month)
             .order_by(Expenditure.month)
         )).all()
-        monthly = [{"month": r.month, "amount_lakhs": r.amount} for r in rows]
+        snapshots = await load_snapshots(db, (r.snapshot_id for r in rows))
+        monthly = [
+            {"month": r.month, "amount_lakhs": r.amount,
+             "source": snapshot_source(snapshots.get(r.snapshot_id), measure="utilized")}
+            for r in rows
+        ]
         if rows:
+            newest = snapshots.get(newest_id(r.snapshot_id for r in rows))
             monthly_source = FigureSource(
                 source_type="live",
                 label=f"{live_label({r.source for r in rows})} (provisional)",
                 measure="utilized",
-                fetched_at=max((r.updated for r in rows if r.updated), default=None),
+                source_url=newest.source_url if newest else None,
+                snapshot_id=newest.id if newest else None,
+                fetched_at=newest.fetched_at if newest else max((r.updated for r in rows if r.updated), default=None),
                 provisional=True,
             )
         else:
@@ -242,12 +252,14 @@ async def get_gap_analysis(
             func.sum(SchemeProgress.funds_released).label("total"),
             func.max(SchemeProgress.source).label("source"),
             func.max(SchemeProgress.created_at).label("updated"),
+            func.max(SchemeProgress.snapshot_id).label("snapshot_id"),
         )
         .join(SchemeProgress, SchemeProgress.scheme_id == Scheme.id)
         .where(SchemeProgress.financial_year == financial_year, Scheme.department_id.in_(list(figures)))
         .group_by(Scheme.department_id)
     )).all()
     pfms = {r.department_id: r for r in pfms_rows if r.total is not None}   # a real 0 release is kept
+    release_snapshots = await load_snapshots(db, (r.snapshot_id for r in pfms.values()))
 
     results = []
     for dept in departments:
@@ -274,12 +286,11 @@ async def get_gap_analysis(
         sources = {
             "allocated_lakhs": to_source(fig.allocated),
             "utilized_lakhs": to_source(fig.utilized),
-            "released_lakhs": FigureSource(
-                source_type="live",
-                label=f"{live_label({release_row.source})} (provisional)",
-                measure="released",
-                fetched_at=release_row.updated,
-                provisional=True,
+            "released_lakhs": (
+                snapshot_source(release_snapshots.get(release_row.snapshot_id), measure="released",
+                                label=f"{live_label({release_row.source})} (provisional)")
+                or FigureSource(source_type="live", label=f"{live_label({release_row.source})} (provisional)",
+                                measure="released", fetched_at=release_row.updated, provisional=True)
             ) if release_row else FigureSource(source_type=None, label="No live PFMS release figure; gap uses the allocation"),
         }
         results.append(GapAnalysisItem(

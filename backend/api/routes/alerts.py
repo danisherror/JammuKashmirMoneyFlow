@@ -8,6 +8,7 @@ POST /api/v1/alerts/trigger/{collector_name}  (manual run)
 from fastapi import APIRouter, Depends, Query, HTTPException, BackgroundTasks, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
+from sqlalchemy.orm import selectinload
 from datetime import datetime, timezone
 
 from database.connection import get_db
@@ -16,6 +17,7 @@ from api.schemas import (
     AccountabilityFlag, CAGFindingItem, LowUtilizationAlert, SyncStatusItem, TriggerResponse,
 )
 from api.official import grant_flags, latest_detail_year
+from api.provenance import snapshot_source
 from scheduler.jobs import ALL_COLLECTORS, next_run_times
 
 router = APIRouter(prefix="/alerts", tags=["Alerts"])
@@ -137,6 +139,7 @@ async def get_low_utilization_alerts(
             SchemeProgress.utilization_pct < threshold_pct,
             SchemeProgress.funds_allocated >= min_allocation_lakhs,
         )
+        .options(selectinload(SchemeProgress.snapshot))
         .order_by(SchemeProgress.utilization_pct.asc())
     )).all()
 
@@ -154,6 +157,7 @@ async def get_low_utilization_alerts(
             utilization_pct=sp.utilization_pct,
             severity=severity,
             snapshot_date=sp.snapshot_date,
+            source=snapshot_source(sp.snapshot, measure="utilization_pct"),
         ))
 
     return results
@@ -237,6 +241,7 @@ async def get_cag_findings(
 
     rows = (await db.execute(
         select(CAGFinding)
+        .options(selectinload(CAGFinding.snapshot))
         .order_by(desc(CAGFinding.report_year), desc(CAGFinding.id))
         .limit(limit)
     )).scalars().all()
@@ -253,6 +258,7 @@ async def get_cag_findings(
             "severity": r.severity,
             "paragraph_ref": r.paragraph_ref,
             "source_pdf_url": r.source_pdf_url,
+            "source": snapshot_source(r.snapshot, source_type="official", measure="amount_flagged"),
         }
         for r in rows
     ]

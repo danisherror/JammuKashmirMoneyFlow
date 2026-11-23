@@ -22,6 +22,7 @@ const base: FigureSource = {
   fetched_at: '2026-11-22T06:07:50Z',
   provisional: false,
   mismatch: null,
+  download_url: '/api/v1/snapshots/3',
 }
 
 describe('parseView', () => {

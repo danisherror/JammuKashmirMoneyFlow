@@ -18,6 +18,10 @@ implemented) live path failed. This removes what they left behind:
 | budget_allocations | database/seeds.py         | uncited seed figures (now database/demo_data.py):  |
 |                    |                           | is_demo false, source "jkfinance.nic.in", and the  |
 |                    |                           | department, year and amount equal a demo figure    |
+| every fact table   | anything before 1.4       | snapshot_id IS NULL: no saved source document, so  |
+| (budget, spending, |                           | the figure can't be traced -> row deleted. The     |
+| schemes, tenders,  |                           | next API startup then sets snapshot_id NOT NULL    |
+| DBT, CAG)          |                           | (database.connection.enforce_not_null)             |
 | data_sync_log      | the six collectors above  | old "success" runs relabelled "failed", since they |
 |                    |                           | saved simulated data, not real data                |
 
@@ -63,6 +67,9 @@ SIMULATED_COLLECTORS = (
     "cga_collector",
     "cag_collector",
 )
+
+# Every table whose rows are figures shown on the dashboard; each needs a snapshot_id.
+FACT_TABLES = (BudgetAllocation, Expenditure, SchemeProgress, Tender, DBTTransfer, CAGFinding)
 
 FAKE_TENDERS_URL = "https://jktenders.gov.in/nicgep/app"
 FAKE_TENDER_REF = re.compile(r"^NIT/[A-Z0-9_&-]+/\d{4}/\d{4}$")
@@ -159,6 +166,17 @@ def purge(db: Session, apply: bool = False, today: date | None = None) -> dict[s
     ]
     counts["budget_allocations (uncited seed figures) deleted"] = len(seeded_allocs)
 
+    # Fact rows with no saved source document (saved before snapshot_id existed, todo.md 1.4)
+    already = {id(r) for r in fake_progress + fake_dbt + fake_exp + fake_tenders + fake_cag + seeded_allocs}
+    untraceable = []
+    for model in FACT_TABLES:
+        rows = [
+            r for r in db.execute(select(model).where(model.snapshot_id.is_(None))).scalars()
+            if id(r) not in already
+        ]
+        counts[f"{model.__tablename__} without a snapshot deleted"] = len(rows)
+        untraceable += rows
+
     old_successes = db.execute(
         select(DataSyncLog).where(
             DataSyncLog.collector_name.in_(SIMULATED_COLLECTORS),
@@ -172,7 +190,7 @@ def purge(db: Session, apply: bool = False, today: date | None = None) -> dict[s
         return counts
 
     stamp = (today or date.today()).isoformat()
-    for row in fake_progress + fake_dbt + fake_exp + fake_tenders + fake_cag + seeded_allocs:
+    for row in fake_progress + fake_dbt + fake_exp + fake_tenders + fake_cag + seeded_allocs + untraceable:
         db.delete(row)
     for row in pfms_rows:
         row.funds_released = None

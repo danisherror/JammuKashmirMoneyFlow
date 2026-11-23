@@ -1,8 +1,8 @@
 """
 Load live and official figures for the budget routes and resolve them for a view.
 
-Live:     `budget_allocations` (allocation) and `expenditures` (spending). Neither table has a
-          snapshot yet (todo.md 1.4), so live figures carry only their `source` string and update time.
+Live:     `budget_allocations` (allocation) and `expenditures` (spending). Each row has a snapshot
+          (todo.md 1.4); a live figure summed over several rows points at the newest one.
 Official: `appropriation_account_lines` (CAG, ₹ thousand) linked to departments through
           `grant_department_map`. Final grant is compared with the live allocation, gross
           expenditure with live spending.
@@ -25,6 +25,7 @@ from database.models import (
     GrantDepartmentMap,
     SourceSnapshot,
 )
+from api.provenance import load_snapshots
 from processors.combined_view import Figure, Resolved, View, resolve
 
 
@@ -152,8 +153,9 @@ class LiveAllocation:
     capital_flags: set[bool] = field(default_factory=set)
     sources: set[str | None] = field(default_factory=set)
     updated: datetime | None = None
+    snapshot: SourceSnapshot | None = None     # newest snapshot among the rows added
 
-    def add(self, alloc: BudgetAllocation) -> None:
+    def add(self, alloc: BudgetAllocation, snapshot: SourceSnapshot | None = None) -> None:
         self.budget_estimate += alloc.budget_estimate
         if alloc.revised_estimate is not None:
             self.revised_estimate = (self.revised_estimate or 0) + alloc.revised_estimate
@@ -165,25 +167,33 @@ class LiveAllocation:
         self.sources.add(alloc.source)
         if alloc.last_updated and (self.updated is None or alloc.last_updated > self.updated):
             self.updated = alloc.last_updated
+        if snapshot is not None and (self.snapshot is None or snapshot.id > self.snapshot.id):
+            self.snapshot = snapshot
 
     @property
     def is_capital(self) -> bool | None:
         return next(iter(self.capital_flags)) if len(self.capital_flags) == 1 else None
 
     def figure(self, value: float, measure: str) -> Figure:
-        return Figure(value=value, source_type="live", label=live_label(self.sources),
-                      measure=measure, fetched_at=self.updated)
+        snap = self.snapshot
+        return Figure(value=value, source_type="live", label=live_label(self.sources), measure=measure,
+                      source_url=snap.source_url if snap else None, snapshot_id=snap.id if snap else None,
+                      fetched_at=snap.fetched_at if snap else self.updated)
 
 
 async def load_live_allocations(
     db: AsyncSession, financial_year: str, department_ids: list[int] | None = None
 ) -> dict[int, LiveAllocation]:
-    query = select(BudgetAllocation).where(BudgetAllocation.financial_year == financial_year)
+    query = (
+        select(BudgetAllocation, SourceSnapshot)
+        .outerjoin(SourceSnapshot, BudgetAllocation.snapshot_id == SourceSnapshot.id)
+        .where(BudgetAllocation.financial_year == financial_year)
+    )
     if department_ids is not None:
         query = query.where(BudgetAllocation.department_id.in_(department_ids))
     out: dict[int, LiveAllocation] = {}
-    for alloc in (await db.execute(query)).scalars():
-        out.setdefault(alloc.department_id, LiveAllocation()).add(alloc)
+    for alloc, snapshot in (await db.execute(query)).all():
+        out.setdefault(alloc.department_id, LiveAllocation()).add(alloc, snapshot)
     return out
 
 
@@ -197,20 +207,24 @@ async def load_live_spending(
             func.sum(Expenditure.utilized_amount).label("total"),
             func.max(Expenditure.source).label("source"),
             func.max(Expenditure.created_at).label("updated"),
+            func.max(Expenditure.snapshot_id).label("snapshot_id"),
         )
         .where(Expenditure.financial_year == financial_year)
         .group_by(Expenditure.department_id)
     )
     if department_ids is not None:
         query = query.where(Expenditure.department_id.in_(department_ids))
-    return {
-        row.department_id: Figure(
-            value=float(row.total), source_type="live", label=live_label({row.source}),
-            measure="utilized", fetched_at=row.updated,
+    rows = [r for r in (await db.execute(query)).all() if r.total is not None]
+    snapshots = await load_snapshots(db, (r.snapshot_id for r in rows))
+    out = {}
+    for row in rows:
+        snap = snapshots.get(row.snapshot_id)
+        out[row.department_id] = Figure(
+            value=float(row.total), source_type="live", label=live_label({row.source}), measure="utilized",
+            source_url=snap.source_url if snap else None, snapshot_id=snap.id if snap else None,
+            fetched_at=snap.fetched_at if snap else row.updated,
         )
-        for row in (await db.execute(query)).all()
-        if row.total is not None
-    }
+    return out
 
 
 # ── Per-department resolution ─────────────────────────────────────────────────

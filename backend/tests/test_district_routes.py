@@ -13,6 +13,7 @@ from database.connection import get_db
 from database.models import (
     Base, Department, District, DivisionType, Scheme, SchemeProgress, SchemeType,
 )
+from tests.provenance_helpers import make_snapshot
 
 YEAR = "2025-26"
 
@@ -32,13 +33,14 @@ def client(tmp_path):
         empty = District(name="Kupwara", code="KPW", division=DivisionType.KASHMIR)
         db.add_all([jjm, with_data, with_null_util, empty])
         db.flush()
+        snap = make_snapshot(db, "jjm_collector")
         db.add_all([
             SchemeProgress(scheme_id=jjm.id, district_id=with_data.id, financial_year=YEAR,
                            funds_allocated=100, funds_utilized=0, utilization_pct=0.0,
-                           snapshot_date=date(2025, 10, 1)),
+                           snapshot_date=date(2025, 10, 1), snapshot_id=snap.id),
             SchemeProgress(scheme_id=jjm.id, district_id=with_null_util.id, financial_year=YEAR,
                            funds_allocated=None, funds_utilized=None, utilization_pct=None,
-                           snapshot_date=date(2025, 10, 1)),
+                           snapshot_date=date(2025, 10, 1), snapshot_id=snap.id),
         ])
         db.commit()
         ids = {"SGR": with_data.id, "BDG": with_null_util.id, "KPW": empty.id}

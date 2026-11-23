@@ -308,6 +308,8 @@ class JJMCollector(BaseCollector):
                 existing.utilization_pct    = util_pct
                 existing.release_pct        = release_pct
                 existing.raw_data           = row
+                existing.snapshot_id        = self.coverage_snapshot.id
+                existing.funds_snapshot_id  = self.fund_snapshot.id
                 self._records_updated += 1
             else:
                 self.db.add(SchemeProgress(
@@ -326,6 +328,8 @@ class JJMCollector(BaseCollector):
                     snapshot_date     = today,
                     source            = "ejalshakti.gov.in",
                     raw_data          = row,
+                    snapshot_id       = self.coverage_snapshot.id,
+                    funds_snapshot_id = self.fund_snapshot.id,
                 ))
                 self._records_inserted += 1
 

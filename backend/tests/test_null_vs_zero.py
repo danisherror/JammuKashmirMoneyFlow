@@ -22,6 +22,7 @@ from database.models import (
 )
 from processors.data_cleaner import apportion, clean_amount, parse_int, parse_number, percent
 from processors.gap_calculator import last_mile_gap_pct, recalculate_all_gaps
+from tests.provenance_helpers import make_snapshot
 
 YEAR = "2025-26"
 
@@ -88,8 +89,15 @@ def sync_db(tmp_path):
     engine.dispose()
 
 
-def test_jjm_save_stores_unknown_funds_as_null(sync_db):
+def jjm(sync_db) -> JJMCollector:
     collector = JJMCollector(sync_db, financial_year=YEAR)
+    collector.coverage_snapshot = make_snapshot(sync_db, "jjm_coverage")
+    collector.fund_snapshot = make_snapshot(sync_db, "jjm_funds")
+    return collector
+
+
+def test_jjm_save_stores_unknown_funds_as_null(sync_db):
+    collector = jjm(sync_db)
     scheme = sync_db.execute(select(Scheme)).scalar_one()
     collector._save_progress(
         scheme,
@@ -108,7 +116,7 @@ def test_jjm_save_stores_unknown_funds_as_null(sync_db):
 
 
 def test_jjm_save_with_an_unknown_household_count_leaves_funds_unknown(sync_db):
-    collector = JJMCollector(sync_db, financial_year=YEAR)
+    collector = jjm(sync_db)
     scheme = sync_db.execute(select(Scheme)).scalar_one()
     collector._save_progress(
         scheme,
@@ -125,7 +133,8 @@ def test_gap_calculator_does_not_turn_unknown_into_zero(sync_db):
     row = SchemeProgress(scheme_id=scheme.id, district_id=sgr.id, financial_year=YEAR,
                          funds_allocated=100, funds_released=None, funds_utilized=0,
                          target_physical=None, achieved_physical=5,
-                         release_pct=55.0, snapshot_date=date(2025, 10, 1))
+                         release_pct=55.0, snapshot_date=date(2025, 10, 1),
+                         snapshot_id=make_snapshot(sync_db).id)
     sync_db.add(row)
     sync_db.commit()
     recalculate_all_gaps(sync_db, YEAR)
@@ -151,17 +160,20 @@ def client(tmp_path):
         db.add_all([known, unknown, sgr])
         db.flush()
         day = date(2025, 10, 1)
+        snap = make_snapshot(db).id
         db.add_all([
             DBTTransfer(scheme_id=known.id, district_id=sgr.id, financial_year=YEAR, snapshot_date=day,
                         beneficiaries_enrolled=10, beneficiaries_paid=10, amount_transferred=0,
-                        last_mile_gap_pct=0.0),
-            DBTTransfer(scheme_id=unknown.id, district_id=sgr.id, financial_year=YEAR, snapshot_date=day),
+                        last_mile_gap_pct=0.0, snapshot_id=snap),
+            DBTTransfer(scheme_id=unknown.id, district_id=sgr.id, financial_year=YEAR, snapshot_date=day,
+                        snapshot_id=snap),
             SchemeProgress(scheme_id=unknown.id, district_id=sgr.id, financial_year=YEAR, snapshot_date=day,
-                           funds_allocated=100, funds_utilized=None),
+                           funds_allocated=100, funds_utilized=None, snapshot_id=snap),
             SchemeProgress(scheme_id=known.id, district_id=sgr.id, financial_year=YEAR, snapshot_date=day,
-                           funds_allocated=100, funds_utilized=0, utilization_pct=0.0),
-            Tender(tender_ref="T1", title="No award amount", status="awarded", contractor_name="A"),
-            BudgetAllocation(department_id=dept.id, financial_year=YEAR, budget_estimate=500),
+                           funds_allocated=100, funds_utilized=0, utilization_pct=0.0, snapshot_id=snap),
+            Tender(tender_ref="T1", title="No award amount", status="awarded", contractor_name="A",
+                   snapshot_id=snap),
+            BudgetAllocation(department_id=dept.id, financial_year=YEAR, budget_estimate=500, snapshot_id=snap),
         ])
         db.commit()
         ids = {"known": known.id, "unknown": unknown.id}
@@ -215,7 +227,7 @@ def test_low_utilization_alert_keeps_real_zero(client):
 def test_contractor_without_award_amount_is_null(client):
     c, _ = client
     rows = c.get("/api/v1/tenders/contractors").json()
-    assert rows == [{"contractor_name": "A", "total_tenders_won": 1, "total_awarded_lakhs": None}]
+    assert [(r["contractor_name"], r["total_tenders_won"], r["total_awarded_lakhs"]) for r in rows] == [("A", 1, None)]
 
 
 def test_gap_csv_leaves_unknowns_blank(client):

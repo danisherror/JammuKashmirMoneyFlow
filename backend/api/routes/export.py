@@ -14,6 +14,7 @@ from fastapi import APIRouter, Depends, Query
 from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+from sqlalchemy.orm import selectinload
 
 from database.connection import get_db
 from processors.data_cleaner import percent
@@ -52,12 +53,24 @@ def csv_response(rows: list[dict], filename: str) -> StreamingResponse:
     )
 
 
+def provenance(snapshot) -> dict:
+    """Columns that let a reader trace an exported row to its saved source document (todo.md 1.4)."""
+    return {
+        "snapshot_id":         snapshot.id if snapshot else None,
+        "snapshot_url":        f"/api/v1/snapshots/{snapshot.id}" if snapshot else None,
+        "source_url":          snapshot.source_url if snapshot else None,
+        "fetched_at":          snapshot.fetched_at.isoformat() if snapshot else None,
+        "source_sha256":       snapshot.sha256 if snapshot else None,
+    }
+
+
 async def _scheme_progress_rows(db: AsyncSession, financial_year: str) -> list[dict]:
     rows = (await db.execute(
         select(SchemeProgress, Scheme, District, Department)
         .join(Scheme, SchemeProgress.scheme_id == Scheme.id)
         .join(District, SchemeProgress.district_id == District.id)
         .join(Department, Scheme.department_id == Department.id)
+        .options(selectinload(SchemeProgress.snapshot))
         .where(SchemeProgress.financial_year == financial_year)
         .order_by(SchemeProgress.snapshot_date.desc(), Scheme.name, District.name)
     )).all()
@@ -83,6 +96,8 @@ async def _scheme_progress_rows(db: AsyncSession, financial_year: str) -> list[d
             "utilization_pct":      sp.utilization_pct,
             "release_pct":          sp.release_pct,
             "source":               sp.source,
+            **provenance(sp.snapshot),
+            "funds_snapshot_id":    sp.funds_snapshot_id,
         }
         for sp, scheme, district, dept in rows
     ]
@@ -91,6 +106,7 @@ async def _scheme_progress_rows(db: AsyncSession, financial_year: str) -> list[d
 async def _tenders_rows(db: AsyncSession) -> list[dict]:
     rows = (await db.execute(
         select(Tender)
+        .options(selectinload(Tender.snapshot))
         .order_by(Tender.published_date.desc())
     )).scalars().all()
 
@@ -107,7 +123,8 @@ async def _tenders_rows(db: AsyncSession) -> list[dict]:
             "published_date":   t.published_date,
             "bid_end_date":     t.bid_end_date,
             "award_date":       t.award_date,
-            "source_url":       t.source_url,
+            "tender_url":       t.source_url,
+            **provenance(t.snapshot),
         }
         for t in rows
     ]
@@ -118,6 +135,7 @@ async def _dbt_rows(db: AsyncSession, financial_year: str) -> list[dict]:
         select(DBTTransfer, Scheme, District)
         .join(Scheme, DBTTransfer.scheme_id == Scheme.id)
         .join(District, DBTTransfer.district_id == District.id)
+        .options(selectinload(DBTTransfer.snapshot))
         .where(DBTTransfer.financial_year == financial_year)
         .order_by(DBTTransfer.snapshot_date.desc())
     )).all()
@@ -133,6 +151,7 @@ async def _dbt_rows(db: AsyncSession, financial_year: str) -> list[dict]:
             "transactions_count":       dbt.transactions_count,
             "amount_transferred_lakh":  dbt.amount_transferred,
             "last_mile_gap_pct":        dbt.last_mile_gap_pct,
+            **provenance(dbt.snapshot),
         }
         for dbt, scheme, district in rows
     ]
@@ -284,6 +303,7 @@ async def export_gap_analysis(
             "gap_lakhs": gap,
             "utilization_pct": percent(utilized, budget),
             "is_demo": alloc.is_demo,
+            "allocation_snapshot_id": alloc.snapshot_id,
         })
     output_rows.sort(key=lambda x: (x["gap_lakhs"] is not None, x["gap_lakhs"] or 0), reverse=True)
     return csv_response(output_rows, f"jk_gap_analysis_{financial_year.replace('-','_')}.csv")
@@ -296,7 +316,8 @@ async def export_cag_findings(db: AsyncSession = Depends(get_db)):
     from sqlalchemy import desc
 
     rows = (await db.execute(
-        select(CAGFinding).order_by(desc(CAGFinding.report_year), desc(CAGFinding.id))
+        select(CAGFinding).options(selectinload(CAGFinding.snapshot))
+        .order_by(desc(CAGFinding.report_year), desc(CAGFinding.id))
     )).scalars().all()
 
     output_rows = [
@@ -309,6 +330,7 @@ async def export_cag_findings(db: AsyncSession = Depends(get_db)):
             "severity": r.severity,
             "paragraph_ref": r.paragraph_ref,
             "source_pdf_url": r.source_pdf_url,
+            **provenance(r.snapshot),
         }
         for r in rows
     ]

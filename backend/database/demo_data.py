@@ -8,12 +8,19 @@ off. config.Settings refuses DEMO_MODE=true with APP_ENV=production.
 
 Amounts are in ₹ lakhs.
 """
+import json
+
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from database.models import BudgetAllocation, Department
+from database.models import BudgetAllocation, Department, SourceSnapshot
+from database.snapshots import save_snapshot_async
 
 DEMO_SOURCE = "DEMO DATA — NOT REAL"
+# Demo rows need a snapshot like every fact row (todo.md 1.4). Theirs is the demo table itself, so
+# "download saved copy" on a demo figure hands back the made-up numbers, clearly labelled.
+DEMO_SNAPSHOT_TYPE = "demo"
+DEMO_SNAPSHOT_URL = "demo:backend/database/demo_data.py"
 
 # Labelled "from J&K Budget documents" when they were seed data, but never cited (todo.md 2.2).
 BUDGET_2024_25 = {
@@ -66,13 +73,22 @@ BUDGET_2023_24 = {
 DEMO_ALLOCATIONS = {"2024-25": BUDGET_2024_25, "2023-24": BUDGET_2023_24}
 
 
-async def seed_demo_allocations(db: AsyncSession) -> int:
+async def seed_demo_allocations(db: AsyncSession, snapshot_dir=None) -> int:
     """Insert the demo allocations that aren't there yet. Returns the number of rows added."""
     dept_ids = dict((await db.execute(select(Department.code, Department.id))).all())
     existing = set((await db.execute(
         select(BudgetAllocation.department_id, BudgetAllocation.financial_year)
         .where(BudgetAllocation.is_demo.is_(True))
     )).all())
+    content = json.dumps(
+        {"note": "DEMO DATA — NOT REAL. Made-up budget allocations, ₹ lakhs.", "allocations": DEMO_ALLOCATIONS},
+        ensure_ascii=False, indent=2, sort_keys=True,
+    ).encode()
+    snapshot = await save_snapshot_async(
+        db, content, source_url=DEMO_SNAPSHOT_URL, source_type=DEMO_SNAPSHOT_TYPE,
+        content_type="application/json", collector_name="demo_data", title=DEMO_SOURCE,
+        snapshot_dir=snapshot_dir,
+    )
     added = 0
     for fy, budgets in DEMO_ALLOCATIONS.items():
         for code, budget in budgets.items():
@@ -86,6 +102,7 @@ async def seed_demo_allocations(db: AsyncSession) -> int:
                 is_capital=budget["is_capital"],
                 source=DEMO_SOURCE,
                 is_demo=True,
+                snapshot_id=snapshot.id,
             ))
             added += 1
     await db.flush()
@@ -93,6 +110,7 @@ async def seed_demo_allocations(db: AsyncSession) -> int:
 
 
 async def delete_demo_rows(db: AsyncSession) -> int:
-    """Remove every demo row. Called on startup when DEMO_MODE is off."""
+    """Remove every demo row and the demo snapshot. Called on startup when DEMO_MODE is off."""
     result = await db.execute(delete(BudgetAllocation).where(BudgetAllocation.is_demo.is_(True)))
+    await db.execute(delete(SourceSnapshot).where(SourceSnapshot.source_type == DEMO_SNAPSHOT_TYPE))
     return result.rowcount or 0

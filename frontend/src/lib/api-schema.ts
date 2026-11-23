@@ -742,6 +742,8 @@ export interface components {
             paragraph_ref: string | null;
             /** Source Pdf Url */
             source_pdf_url: string | null;
+            /** @description Saved source document this row was read from (source URL, fetch time, download link) */
+            source?: components["schemas"]["FigureSource"] | null;
         };
         /** ContractorLeaderboardItem */
         ContractorLeaderboardItem: {
@@ -754,6 +756,8 @@ export interface components {
              * @description ₹ lakhs; null when no awarded amount is known
              */
             total_awarded_lakhs: number | null;
+            /** @description Most recently saved source document among the rows added up here */
+            source?: components["schemas"]["FigureSource"] | null;
         };
         /** DBTDistrictGap */
         DBTDistrictGap: {
@@ -771,6 +775,8 @@ export interface components {
             amount_transferred_lakhs: number | null;
             /** Last Mile Gap Pct */
             last_mile_gap_pct: number | null;
+            /** @description Saved source document this row was read from (source URL, fetch time, download link) */
+            source?: components["schemas"]["FigureSource"] | null;
         };
         /**
          * DBTSchemeSummary
@@ -796,6 +802,8 @@ export interface components {
              * @description null when enrolled or paid is unknown
              */
             overall_gap_pct: number | null;
+            /** @description Most recently saved source document among the rows added up here */
+            source?: components["schemas"]["FigureSource"] | null;
         };
         /** DepartmentDetail */
         DepartmentDetail: {
@@ -904,6 +912,8 @@ export interface components {
              * @description null when the district has no data
              */
             absorption_grade: ("A" | "B" | "C" | "D" | "F") | null;
+            /** @description Most recently saved source document among the rows added up here */
+            source?: components["schemas"]["FigureSource"] | null;
             /**
              * Scheme Progress
              * @default []
@@ -940,6 +950,8 @@ export interface components {
              * @description null when the district has no data
              */
             absorption_grade: ("A" | "B" | "C" | "D" | "F") | null;
+            /** @description Most recently saved source document among the rows added up here */
+            source?: components["schemas"]["FigureSource"] | null;
         };
         /**
          * DivisionEnum
@@ -1003,6 +1015,11 @@ export interface components {
              */
             provisional: boolean;
             mismatch?: components["schemas"]["MismatchInfo"] | null;
+            /**
+             * Download Url
+             * @description Path of the saved source file (GET /api/v1/snapshots/{id}); null without a snapshot
+             */
+            readonly download_url: string | null;
         };
         /** GapAnalysisItem */
         GapAnalysisItem: {
@@ -1235,6 +1252,8 @@ export interface components {
              * Format: date
              */
             snapshot_date: string;
+            /** @description Saved source document this row was read from (source URL, fetch time, download link) */
+            source?: components["schemas"]["FigureSource"] | null;
         };
         /**
          * MismatchInfo
@@ -1269,6 +1288,8 @@ export interface components {
              * @description ₹ lakhs
              */
             amount_lakhs: number | null;
+            /** @description Most recently saved source document among the rows added up here */
+            source?: components["schemas"]["FigureSource"] | null;
         };
         /** NoteItem */
         NoteItem: {
@@ -1433,6 +1454,10 @@ export interface components {
             scheme_name?: string | null;
             /** Scheme Code */
             scheme_code?: string | null;
+            /** @description Saved source document this row was read from (source URL, fetch time, download link) */
+            source?: components["schemas"]["FigureSource"] | null;
+            /** @description Separate document the fund figures came from (JJM/MGNREGA state fund statement), if any */
+            funds_source?: components["schemas"]["FigureSource"] | null;
         };
         /**
          * SchemeHistoryPoint
@@ -1665,6 +1690,8 @@ export interface components {
             published_date: string | null;
             /** Award Date */
             award_date: string | null;
+            /** @description Saved source document this row was read from (source URL, fetch time, download link) */
+            source?: components["schemas"]["FigureSource"] | null;
         };
         /** TriggerResponse */
         TriggerResponse: {

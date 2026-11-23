@@ -11,11 +11,13 @@ therefore returns no figures, and the combined view returns the live ones marked
 from fastapi import APIRouter, Depends, Query, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
+from sqlalchemy.orm import selectinload
 from datetime import date
 
 from database.connection import get_db
-from database.models import Scheme, SchemeProgress, District, Department
+from database.models import Scheme, SchemeProgress, SourceSnapshot, District, Department
 from api.figures import live_label, to_source
+from api.provenance import load_snapshots, newest_id, snapshot_source
 from api.schemas import (
     FigureSource, SchemeSummary, SchemeDetail, SchemeDistrictProgress, SchemeHistoryPoint, SchemeVelocity,
 )
@@ -39,14 +41,20 @@ def scheme_sources(
     values: dict[str, tuple[float | None, str]],
     source: str | None,
     updated,
+    snapshot: SourceSnapshot | None = None,
 ) -> tuple[dict[str, float | None], dict[str, FigureSource]]:
-    """Resolve each live scheme figure ({field: (value, measure)}) for `view`; returns values + sources."""
+    """
+    Resolve each live scheme figure ({field: (value, measure)}) for `view`; returns values + sources.
+    `snapshot` is the newest saved document among the rows summed (todo.md 1.4).
+    """
     out_values: dict[str, float | None] = {}
     out_sources: dict[str, FigureSource] = {"total_outlay_lakhs": OUTLAY_SOURCE}
     for name, (value, measure) in values.items():
         live = Figure(
             value=value, source_type="live", label=live_label({source}), measure=measure,
-            source_url=scheme.source_url, fetched_at=updated,
+            source_url=snapshot.source_url if snapshot else scheme.source_url,
+            snapshot_id=snapshot.id if snapshot else None,
+            fetched_at=snapshot.fetched_at if snapshot else updated,
         ) if value is not None else None
         note = OFFICIAL_NOTE if view is View.OFFICIAL else f"No data collected for {financial_year}"
         resolved = resolve(view, live, None, note=note)
@@ -84,11 +92,13 @@ async def list_schemes(
             func.max(SchemeProgress.snapshot_date).label("latest_date"),
             func.max(SchemeProgress.source).label("source"),
             func.max(SchemeProgress.created_at).label("updated"),
+            func.max(SchemeProgress.snapshot_id).label("snapshot_id"),
         ).where(
             SchemeProgress.financial_year == financial_year,
         ).group_by(SchemeProgress.scheme_id)
     )).all()
     agg_map = {row.scheme_id: row for row in agg_rows}
+    snapshots = await load_snapshots(db, (row.snapshot_id for row in agg_rows))
 
     results = []
     for scheme, dept in rows:
@@ -99,7 +109,8 @@ async def list_schemes(
             "funds_utilized_lakhs": (to_int(row.utilized) if row else None, "utilized"),
             "physical_pct": (round(row.avg_physical, 2) if row and row.avg_physical is not None else None,
                              "physical_progress_pct"),
-        }, row.source if row else None, row.updated if row else None)
+        }, row.source if row else None, row.updated if row else None,
+            snapshots.get(row.snapshot_id) if row else None)
         allocated, utilized = values["funds_allocated_lakhs"], values["funds_utilized_lakhs"]
 
         results.append(SchemeSummary(
@@ -155,6 +166,7 @@ async def get_scheme_detail(
     district_rows = [] if latest_date is None else (await db.execute(
         select(SchemeProgress, District)
         .join(District, SchemeProgress.district_id == District.id)
+        .options(selectinload(SchemeProgress.snapshot), selectinload(SchemeProgress.funds_snapshot))
         .where(
             SchemeProgress.scheme_id == scheme_id,
             SchemeProgress.financial_year == financial_year,
@@ -179,6 +191,8 @@ async def get_scheme_detail(
             utilization_pct=sp.utilization_pct,
             release_pct=sp.release_pct,
             snapshot_date=sp.snapshot_date,
+            source=snapshot_source(sp.snapshot),
+            funds_source=snapshot_source(sp.funds_snapshot, measure="state fund totals, split by district share"),
         )
         for sp, district in district_rows
     ]
@@ -197,6 +211,7 @@ async def get_scheme_detail(
     },
         max((sp.source for sp in snapshots if sp.source), default=None),
         max((sp.created_at for sp in snapshots if sp.created_at), default=None),
+        max((sp.snapshot for sp in snapshots if sp.snapshot), key=lambda snap: snap.id, default=None),
     )
     if district_progress:
         sources["district_progress"] = sources["funds_utilized_lakhs"]
@@ -254,6 +269,7 @@ async def get_scheme_velocity(
             func.sum(SchemeProgress.funds_utilized).label("utilized"),
             func.max(SchemeProgress.source).label("source"),
             func.max(SchemeProgress.created_at).label("updated"),
+            func.max(SchemeProgress.snapshot_id).label("snapshot_id"),
         )
         .where(
             SchemeProgress.scheme_id == scheme_id,
@@ -275,12 +291,15 @@ async def get_scheme_velocity(
     ]
 
     if rows:
+        newest_snapshot_id = newest_id(r.snapshot_id for r in rows)
+        newest = (await load_snapshots(db, [newest_snapshot_id])).get(newest_snapshot_id)
         history_source = FigureSource(
             source_type="live",
             label=f"{live_label({r.source for r in rows})} (provisional)",
             measure="utilized",
-            source_url=scheme.source_url,
-            fetched_at=max((r.updated for r in rows if r.updated), default=None),
+            source_url=newest.source_url if newest else scheme.source_url,
+            snapshot_id=newest.id if newest else None,
+            fetched_at=newest.fetched_at if newest else max((r.updated for r in rows if r.updated), default=None),
             provisional=True,
         )
     else:

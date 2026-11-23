@@ -6,7 +6,6 @@ from sqlalchemy import create_engine, select
 from sqlalchemy.orm import Session
 
 from database.models import (
-    Base,
     BudgetAllocation,
     CAGFinding,
     CollectorStatus,
@@ -22,14 +21,16 @@ from database.models import (
     Tender,
 )
 from scripts.purge_simulated_data import FAKE_CAG_PDF_URL, FAKE_CAG_TITLE, FAKE_TENDERS_URL, purge
+from tests.provenance_helpers import legacy_metadata, make_snapshot
 
 DAY = date(2026, 11, 1)
 
 
 @pytest.fixture
 def db():
+    # An old database: snapshot_id exists but is nullable, and the simulated rows have none.
     engine = create_engine("sqlite://")
-    Base.metadata.create_all(engine)
+    legacy_metadata().create_all(engine)
     with Session(engine) as session:
         dept = Department(name="Jal Shakti", code="JALSHAKTI", division=DivisionType.CENTRAL)
         dist = District(name="Jammu", code="JMU", division=DivisionType.JAMMU)
@@ -61,33 +62,40 @@ def progress(scheme_id, district_id, **kw):
 
 def seed(db):
     schemes, district, dept = ids(db)
+    snap = make_snapshot(db).id
     db.add_all([
         # PMAY simulation (both markers), a real JJM row, and a UT-scheme row PFMS never touched
         progress(schemes["PMAY_G"], district, source="pmayg.nic.in (simulated)",
                  raw_data={"note": "simulated fallback"}, funds_released=10),
         progress(schemes["JJM"], district, source="ejalshakti.gov.in", funds_allocated=100,
-                 funds_released=80, release_pct=80.0, raw_data={"pfms_note": "simulated fallback"}),
-        progress(schemes["UT1"], district, source="real", funds_released=5, financial_year="2023-24"),
+                 funds_released=80, release_pct=80.0, raw_data={"pfms_note": "simulated fallback"},
+                 snapshot_id=snap),
+        progress(schemes["UT1"], district, source="real", funds_released=5, financial_year="2023-24",
+                 snapshot_id=snap),
+        # looks real, but has no saved source document: untraceable
+        progress(schemes["JJM"], district, source="ejalshakti.gov.in", funds_allocated=7,
+                 financial_year="2022-23"),
         DBTTransfer(scheme_id=schemes["JJM"], district_id=district, financial_year="2024-25",
                     snapshot_date=DAY, source="dbtbharat.gov.in (simulated)"),
         Expenditure(department_id=dept, financial_year="2024-25", month=3,
                     snapshot_date=DAY, source="CGA Simulation"),
         Expenditure(department_id=dept, financial_year="2024-25", month=4,
-                    snapshot_date=DAY, source="cga.nic.in"),
+                    snapshot_date=DAY, source="cga.nic.in", snapshot_id=snap),
         Tender(tender_ref="NIT/JAL/2026/1234", title="Fake", source_url=FAKE_TENDERS_URL,
                contractor_name="M/S Sharma Constructions"),
-        Tender(tender_ref="e-NIT 12 of 2026-27", title="Looks real", source_url=FAKE_TENDERS_URL),
+        Tender(tender_ref="e-NIT 12 of 2026-27", title="Looks real", source_url=FAKE_TENDERS_URL,
+               snapshot_id=snap),
         CAGFinding(report_year=2024, report_title=FAKE_CAG_TITLE, finding_raw="invented",
                    paragraph_ref="Para 3.2", source_pdf_url=FAKE_CAG_PDF_URL),
         CAGFinding(report_year=2024, report_title="A real report", finding_raw="real",
-                   paragraph_ref="Para 3.2", source_pdf_url="https://cag.gov.in/real.pdf"),
+                   paragraph_ref="Para 3.2", source_pdf_url="https://cag.gov.in/real.pdf", snapshot_id=snap),
         # the old seed figure for JALSHAKTI 2024-25; the same amount for another year; a demo row
         BudgetAllocation(department_id=dept, financial_year="2024-25", budget_estimate=380000,
                          source="jkfinance.nic.in"),
         BudgetAllocation(department_id=dept, financial_year="2022-23", budget_estimate=380000,
-                         source="jkfinance.nic.in"),
+                         source="jkfinance.nic.in", snapshot_id=snap),
         BudgetAllocation(department_id=dept, financial_year="2023-24", budget_estimate=342000,
-                         source="DEMO DATA — NOT REAL", is_demo=True),
+                         source="DEMO DATA — NOT REAL", is_demo=True, snapshot_id=snap),
         DataSyncLog(collector_name="pfms_collector", status=CollectorStatus.SUCCESS,
                     started_at=datetime(2026, 11, 2, tzinfo=timezone.utc), records_updated=1),
         DataSyncLog(collector_name="jjm_collector", status=CollectorStatus.SUCCESS,
@@ -104,6 +112,12 @@ EXPECTED = {
     "tenders deleted": 1,
     "cag_findings deleted": 1,
     "budget_allocations (uncited seed figures) deleted": 1,
+    "budget_allocations without a snapshot deleted": 0,
+    "expenditures without a snapshot deleted": 0,
+    "scheme_progress without a snapshot deleted": 1,
+    "tenders without a snapshot deleted": 0,
+    "dbt_transfers without a snapshot deleted": 0,
+    "cag_findings without a snapshot deleted": 0,
     "data_sync_log runs relabelled failed": 1,
 }
 
@@ -111,7 +125,7 @@ EXPECTED = {
 def test_dry_run_counts_without_changing_anything(db):
     seed(db)
     assert purge(db, apply=False) == EXPECTED
-    assert len(db.execute(select(SchemeProgress)).all()) == 3
+    assert len(db.execute(select(SchemeProgress)).all()) == 4
     assert len(db.execute(select(Tender)).all()) == 2
 
 

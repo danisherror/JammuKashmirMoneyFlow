@@ -2051,6 +2051,17 @@
               }
             ],
             "title": "Source Pdf Url"
+          },
+          "source": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FigureSource"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Saved source document this row was read from (source URL, fetch time, download link)"
           }
         },
         "type": "object",
@@ -2090,6 +2101,17 @@
             ],
             "title": "Total Awarded Lakhs",
             "description": "₹ lakhs; null when no awarded amount is known"
+          },
+          "source": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FigureSource"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Most recently saved source document among the rows added up here"
           }
         },
         "type": "object",
@@ -2157,6 +2179,17 @@
               }
             ],
             "title": "Last Mile Gap Pct"
+          },
+          "source": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FigureSource"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Saved source document this row was read from (source URL, fetch time, download link)"
           }
         },
         "type": "object",
@@ -2233,6 +2266,17 @@
             ],
             "title": "Overall Gap Pct",
             "description": "null when enrolled or paid is unknown"
+          },
+          "source": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FigureSource"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Most recently saved source document among the rows added up here"
           }
         },
         "type": "object",
@@ -2627,6 +2671,17 @@
             "title": "Absorption Grade",
             "description": "null when the district has no data"
           },
+          "source": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FigureSource"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Most recently saved source document among the rows added up here"
+          },
           "scheme_progress": {
             "items": {
               "$ref": "#/components/schemas/SchemeDistrictProgress"
@@ -2762,6 +2817,17 @@
             ],
             "title": "Absorption Grade",
             "description": "null when the district has no data"
+          },
+          "source": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FigureSource"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Most recently saved source document among the rows added up here"
           }
         },
         "type": "object",
@@ -2935,12 +3001,26 @@
                 "type": "null"
               }
             ]
+          },
+          "download_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Download Url",
+            "description": "Path of the saved source file (GET /api/v1/snapshots/{id}); null without a snapshot",
+            "readOnly": true
           }
         },
         "type": "object",
         "required": [
           "source_type",
-          "label"
+          "label",
+          "download_url"
         ],
         "title": "FigureSource",
         "description": "Where one figure in the response comes from. Keyed by the figure's field name in `sources`."
@@ -3553,6 +3633,17 @@
             "type": "string",
             "format": "date",
             "title": "Snapshot Date"
+          },
+          "source": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FigureSource"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Saved source document this row was read from (source URL, fetch time, download link)"
           }
         },
         "type": "object",
@@ -3621,6 +3712,17 @@
             ],
             "title": "Amount Lakhs",
             "description": "₹ lakhs"
+          },
+          "source": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FigureSource"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Most recently saved source document among the rows added up here"
           }
         },
         "type": "object",
@@ -4149,6 +4251,28 @@
               }
             ],
             "title": "Scheme Code"
+          },
+          "source": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FigureSource"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Saved source document this row was read from (source URL, fetch time, download link)"
+          },
+          "funds_source": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FigureSource"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Separate document the fund figures came from (JJM/MGNREGA state fund statement), if any"
           }
         },
         "type": "object",
@@ -4834,6 +4958,17 @@
               }
             ],
             "title": "Award Date"
+          },
+          "source": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FigureSource"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Saved source document this row was read from (source URL, fetch time, download link)"
           }
         },
         "type": "object",

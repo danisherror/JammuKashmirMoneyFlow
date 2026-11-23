@@ -339,6 +339,8 @@ class MGNREGACollector(BaseCollector):
                 existing.release_pct        = release_pct
                 existing.physical_pct       = physical_pct
                 existing.raw_data           = row
+                existing.snapshot_id        = self.progress_snapshot.id
+                existing.funds_snapshot_id  = self.fund_snapshot.id
                 self._records_updated += 1
             else:
                 self.db.add(SchemeProgress(
@@ -357,6 +359,8 @@ class MGNREGACollector(BaseCollector):
                     snapshot_date   = today,
                     source          = "nreganarayan.nic.in",
                     raw_data        = row,
+                    snapshot_id     = self.progress_snapshot.id,
+                    funds_snapshot_id = self.fund_snapshot.id,
                 ))
                 self._records_inserted += 1
 

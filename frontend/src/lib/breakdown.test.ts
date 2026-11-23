@@ -5,6 +5,7 @@ import { biggestUnspent, categoryLabel, countFlags, flagLabel, flattenRows, node
 const source: FigureSource = {
   source_type: 'official', label: 'Official · Appropriation Accounts 2023-24, p.20', measure: null,
   source_url: 'https://cag.gov.in/a.pdf', snapshot_id: 1, page: 20, fetched_at: null, provisional: false, mismatch: null,
+  download_url: '/api/v1/snapshots/1',
 }
 
 const row = (over: Partial<HeadRowItem>): HeadRowItem => ({

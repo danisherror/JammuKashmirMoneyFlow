@@ -6,9 +6,11 @@ GET /api/v1/tenders/contractors
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, desc
+from sqlalchemy.orm import selectinload
 
 from database.connection import get_db
 from database.models import Tender
+from api.provenance import load_snapshots, snapshot_source
 from api.schemas import TenderSummary, ContractorLeaderboardItem
 
 router = APIRouter(prefix="/tenders", tags=["Tenders"])
@@ -22,7 +24,7 @@ async def list_tenders(
     db: AsyncSession = Depends(get_db),
 ):
     """Get recent tenders, optionally filtered by department or status."""
-    query = select(Tender).order_by(desc(Tender.published_date))
+    query = select(Tender).options(selectinload(Tender.snapshot)).order_by(desc(Tender.published_date))
     
     if department_id:
         query = query.where(Tender.department_id == department_id)
@@ -45,6 +47,7 @@ async def list_tenders(
             status=t.status,
             published_date=t.published_date,
             award_date=t.award_date,
+            source=snapshot_source(t.snapshot),
         )
         for t in rows
     ]
@@ -62,6 +65,8 @@ async def contractor_leaderboard(
             Tender.contractor_name,
             func.count(Tender.id).label("tenders_won"),
             func.sum(Tender.awarded_cost).label("total_awarded"),
+            func.max(Tender.snapshot_id).label("snapshot_id"),
+            func.count(Tender.snapshot_id.distinct()).label("snapshot_count"),
         )
         .where(Tender.status == "awarded")
         .where(Tender.contractor_name.isnot(None))
@@ -71,12 +76,14 @@ async def contractor_leaderboard(
     )
     
     rows = (await db.execute(query)).all()
-    
+    snapshots = await load_snapshots(db, (row.snapshot_id for row in rows))
+
     return [
         ContractorLeaderboardItem(
             contractor_name=row.contractor_name,
             total_tenders_won=row.tenders_won,
             total_awarded_lakhs=int(row.total_awarded) if row.total_awarded is not None else None,
+            source=snapshot_source(snapshots.get(row.snapshot_id), combined=row.snapshot_count),
         )
         for row in rows
     ]

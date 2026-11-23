@@ -6,11 +6,13 @@ GET /api/v1/dbt/schemes/{id}/gap
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, desc
+from sqlalchemy.orm import selectinload
 
 from database.connection import get_db
 from database.models import DBTTransfer, Scheme, District
 from api.schemas import DBTSchemeSummary, DBTDistrictGap
 from processors.gap_calculator import last_mile_gap_pct
+from api.provenance import load_snapshots, snapshot_source
 
 router = APIRouter(prefix="/dbt", tags=["DBT"])
 
@@ -42,6 +44,8 @@ async def list_dbt_schemes(
             func.sum(DBTTransfer.beneficiaries_enrolled).label("total_enrolled"),
             func.sum(DBTTransfer.beneficiaries_paid).label("total_paid"),
             func.sum(DBTTransfer.amount_transferred).label("total_amount"),
+            func.max(DBTTransfer.snapshot_id).label("snapshot_id"),
+            func.count(DBTTransfer.snapshot_id.distinct()).label("snapshot_count"),
         )
         .join(latest_subq, (DBTTransfer.scheme_id == latest_subq.c.scheme_id) & (DBTTransfer.district_id == latest_subq.c.district_id) & (DBTTransfer.snapshot_date == latest_subq.c.latest))
         .join(Scheme, DBTTransfer.scheme_id == Scheme.id)
@@ -49,6 +53,7 @@ async def list_dbt_schemes(
     )
 
     rows = (await db.execute(query)).all()
+    snapshots = await load_snapshots(db, (r.snapshot_id for r in rows))
     results = []
 
     # SUM skips NULLs and is NULL when every district's figure is unknown: unknown stays null, not 0.
@@ -64,6 +69,7 @@ async def list_dbt_schemes(
             total_beneficiaries_paid=paid,
             total_amount_transferred_lakhs=to_int(r.total_amount),
             overall_gap_pct=last_mile_gap_pct(enrolled, paid),
+            source=snapshot_source(snapshots.get(r.snapshot_id), combined=r.snapshot_count),
         ))
 
     # Most enrolled first; unknown enrolment last.
@@ -97,6 +103,7 @@ async def dbt_scheme_gap(
 
     query = (
         select(DBTTransfer, District)
+        .options(selectinload(DBTTransfer.snapshot))
         .join(latest_subq, (DBTTransfer.district_id == latest_subq.c.district_id) & (DBTTransfer.snapshot_date == latest_subq.c.latest))
         .join(District, DBTTransfer.district_id == District.id)
         .where(
@@ -117,6 +124,7 @@ async def dbt_scheme_gap(
             beneficiaries_paid=dbt.beneficiaries_paid,
             amount_transferred_lakhs=dbt.amount_transferred,
             last_mile_gap_pct=round(dbt.last_mile_gap_pct, 2) if dbt.last_mile_gap_pct is not None else None,
+            source=snapshot_source(dbt.snapshot),
         )
         for dbt, district in rows
     ]

@@ -127,8 +127,47 @@ def add_missing_columns(sync_conn) -> list[str]:
             for index in table.indexes:
                 if [c.name for c in index.columns] == [column.name]:
                     sync_conn.execute(CreateIndex(index, if_not_exists=True))
+            # SQLite can't add a foreign key to an existing table; it doesn't enforce them by default anyway.
+            if sync_conn.dialect.name == "postgresql":
+                for fk in column.foreign_keys:
+                    target = fk.column
+                    sync_conn.execute(text(
+                        f'ALTER TABLE "{table.name}" ADD CONSTRAINT "fk_{table.name}_{column.name}" '
+                        f'FOREIGN KEY ("{column.name}") REFERENCES "{target.table.name}" ("{target.name}")'
+                    ))
             added.append(f"{table.name}.{column.name}")
     return added
+
+
+def enforce_not_null(sync_conn) -> tuple[list[str], dict[str, int]]:
+    """
+    Set NOT NULL on Postgres columns the models require but the database allows (columns that
+    add_missing_columns had to add as nullable). A column that still has NULL rows is left alone and
+    reported, e.g. fact rows saved before snapshot_id existed: `scripts.purge_simulated_data --apply`
+    deletes those untraceable rows, and the next startup sets the constraint.
+    Returns (columns tightened, {column: rows still NULL}).
+    """
+    if sync_conn.dialect.name != "postgresql":
+        return [], {}
+    inspector = inspect(sync_conn)
+    tables = set(inspector.get_table_names())
+    tightened, blocked = [], {}
+    for table in Base.metadata.sorted_tables:
+        if table.name not in tables:
+            continue
+        nullable_in_db = {c["name"] for c in inspector.get_columns(table.name) if c["nullable"]}
+        for column in table.columns:
+            if column.nullable or column.primary_key or column.name not in nullable_in_db:
+                continue
+            nulls = sync_conn.execute(
+                text(f'SELECT count(*) FROM "{table.name}" WHERE "{column.name}" IS NULL')
+            ).scalar()
+            if nulls:
+                blocked[f"{table.name}.{column.name}"] = nulls
+                continue
+            sync_conn.execute(text(f'ALTER TABLE "{table.name}" ALTER COLUMN "{column.name}" SET NOT NULL'))
+            tightened.append(f"{table.name}.{column.name}")
+    return tightened, blocked
 
 
 async def init_db():
@@ -137,10 +176,18 @@ async def init_db():
         await conn.run_sync(Base.metadata.create_all)
         added = await conn.run_sync(add_missing_enum_values)
         columns = await conn.run_sync(add_missing_columns)
+        tightened, blocked = await conn.run_sync(enforce_not_null)
     if added:
         logger.info(f"Added enum values: {', '.join(added)}")
     if columns:
         logger.info(f"Added columns: {', '.join(columns)}")
+    if tightened:
+        logger.info(f"Set NOT NULL: {', '.join(tightened)}")
+    for column, nulls in blocked.items():
+        logger.warning(
+            f"{column} is required but {nulls} existing row(s) have none (saved before it existed). "
+            "Run `python -m scripts.purge_simulated_data --apply` to delete untraceable rows."
+        )
     logger.info("Database tables ready.")
 
 

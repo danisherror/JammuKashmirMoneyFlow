@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from config import Settings
 from database.connection import add_missing_columns
 from database.demo_data import DEMO_ALLOCATIONS, DEMO_SOURCE, delete_demo_rows, seed_demo_allocations
-from database.models import Base, BudgetAllocation
+from database.models import Base, BudgetAllocation, SourceSnapshot
 from database.seeds import seed_departments
 
 
@@ -32,16 +32,21 @@ def test_seed_and_delete_demo_rows(tmp_path):
         async with Session() as db:
             await seed_departments(db)
             expected = sum(len(b) for b in DEMO_ALLOCATIONS.values())
-            assert await seed_demo_allocations(db) == expected
-            assert await seed_demo_allocations(db) == 0   # idempotent
+            assert await seed_demo_allocations(db, tmp_path) == expected
+            assert await seed_demo_allocations(db, tmp_path) == 0   # idempotent
             await db.commit()
             rows = (await db.execute(select(BudgetAllocation))).scalars().all()
             assert len(rows) == expected
             assert all(r.is_demo and r.source == DEMO_SOURCE for r in rows)
+            # demo rows point at a saved copy of the demo table, like every fact row (todo.md 1.4)
+            snapshot = (await db.execute(select(SourceSnapshot))).scalar_one()
+            assert {r.snapshot_id for r in rows} == {snapshot.id}
+            assert b"NOT REAL" in (tmp_path / snapshot.storage_path).read_bytes()
 
             assert await delete_demo_rows(db) == expected
             await db.commit()
             assert (await db.execute(select(BudgetAllocation))).first() is None
+            assert (await db.execute(select(SourceSnapshot))).first() is None
         await engine.dispose()
 
     asyncio.run(scenario())
@@ -72,7 +77,12 @@ def test_is_demo_column_added_to_an_existing_table(tmp_path):
             "INSERT INTO departments (id, name, code, division) VALUES (1, 'PWD', 'PWD', 'CENTRAL')"
         ))
         conn.execute(text(
-            "INSERT INTO budget_allocations (department_id, financial_year, budget_estimate) VALUES (1, '2024-25', 5)"
+            "INSERT INTO source_snapshots (id, source_type, source_url, sha256, storage_path, byte_size, fetched_at) "
+            "VALUES (1, 't', 'u', 'x', 'p', 1, '2026-11-22')"
+        ))
+        conn.execute(text(
+            "INSERT INTO budget_allocations (department_id, financial_year, budget_estimate, snapshot_id) "
+            "VALUES (1, '2024-25', 5, 1)"
         ))
     with engine.begin() as conn:
         assert "budget_allocations.is_demo" in add_missing_columns(conn)
