@@ -344,10 +344,10 @@ class SchemeDetail(SchemeSummary):
 
 
 class SchemeHistoryPoint(BaseModel):
-    """One data point in the spending velocity time-series."""
+    """One data point in the spending velocity time-series. Null amounts are unknown, not 0."""
     snapshot_date: date
-    funds_allocated_lakhs: int
-    funds_utilized_lakhs: int
+    funds_allocated_lakhs: Optional[int]
+    funds_utilized_lakhs: Optional[int]
     utilization_pct: Optional[float]
 
     class Config:
@@ -454,7 +454,7 @@ class LowUtilizationAlert(BaseModel):
     district_name: str
     department_name: str
     funds_allocated_lakhs: int
-    funds_utilized_lakhs: int
+    funds_utilized_lakhs: Optional[int] = Field(description="₹ lakhs; null when not collected")
     utilization_pct: float
     severity: Literal["critical", "warning"] = Field(description="critical below 20%, warning below 40%")
     snapshot_date: date
@@ -484,30 +484,31 @@ class TenderSummary(BaseModel):
 class ContractorLeaderboardItem(BaseModel):
     contractor_name: str
     total_tenders_won: int
-    total_awarded_lakhs: int
+    total_awarded_lakhs: Optional[int] = Field(description="₹ lakhs; null when no awarded amount is known")
 
 
 # ── DBT ───────────────────────────────────────────────────────────────────────
 
 class DBTSchemeSummary(BaseModel):
+    """Totals over the districts with a known figure; null when no district has one (unknown, not 0)."""
     scheme_id: int
     scheme_name: str
     scheme_code: str
     financial_year: str
-    total_beneficiaries_enrolled: int
-    total_beneficiaries_paid: int
-    total_amount_transferred_lakhs: int
-    overall_gap_pct: float
+    total_beneficiaries_enrolled: Optional[int]
+    total_beneficiaries_paid: Optional[int]
+    total_amount_transferred_lakhs: Optional[int]
+    overall_gap_pct: Optional[float] = Field(description="null when enrolled or paid is unknown")
 
 
 class DBTDistrictGap(BaseModel):
     district_id: int
     district_name: str
     district_code: str
-    beneficiaries_enrolled: int
-    beneficiaries_paid: int
-    amount_transferred_lakhs: int
-    last_mile_gap_pct: float
+    beneficiaries_enrolled: Optional[int]
+    beneficiaries_paid: Optional[int]
+    amount_transferred_lakhs: Optional[int]
+    last_mile_gap_pct: Optional[float]
 
     class Config:
         from_attributes = True

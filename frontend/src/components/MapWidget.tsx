@@ -1,6 +1,7 @@
 import { MapContainer, TileLayer, CircleMarker, Tooltip } from 'react-leaflet'
 import { DISTRICT_COORDINATES } from '../lib/districtCoordinates'
 import type { SchemeDistrictProgress } from '../lib/api'
+import { fmtLakhs, fmtPct } from '../lib/utils'
 
 interface MapWidgetProps {
   data: SchemeDistrictProgress[]
@@ -20,7 +21,7 @@ function getColor(pct: number | null) {
 
 export default function MapWidget({ data, height = 400 }: MapWidgetProps) {
   // Find max allocated to scale bubbles
-  const maxAllocated = Math.max(...data.map(d => d.funds_allocated_lakhs || 0), 1)
+  const maxAllocated = Math.max(...data.map(d => d.funds_allocated_lakhs ?? 0), 1)
 
   return (
     <div className="panel overflow-hidden border-[#1a2a3a]" style={{ height, background: '#0a1018' }}>
@@ -41,13 +42,14 @@ export default function MapWidget({ data, height = 400 }: MapWidgetProps) {
           const coords = DISTRICT_COORDINATES[dist.district_code]
           if (!coords) return null
 
-          const allocated = dist.funds_allocated_lakhs || 0
-          const utilized = dist.funds_utilized_lakhs || 0
+          // null = not collected: the tooltip shows "—" and the bubble keeps its minimum size
+          const allocated = dist.funds_allocated_lakhs
+          const utilized = dist.funds_utilized_lakhs
           const utilPct = dist.utilization_pct
           
           // Calculate radius based on allocated funds relative to max
           // Minimum radius 8, max 35
-          const baseRadius = allocated > 0 ? Math.sqrt(allocated / maxAllocated) * 35 : 5
+          const baseRadius = allocated != null && allocated > 0 ? Math.sqrt(allocated / maxAllocated) * 35 : 5
           const radius = Math.max(8, baseRadius)
           
           const color = getColor(utilPct)
@@ -77,11 +79,11 @@ export default function MapWidget({ data, height = 400 }: MapWidgetProps) {
                   <div className="font-bold text-white border-b border-gray-700 pb-1 mb-1">{dist.district_name}</div>
                   <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
                     <span className="text-gray-400">Allocated:</span>
-                    <span className="text-white text-right">₹{allocated.toLocaleString('en-IN')}L</span>
+                    <span className="text-white text-right">{fmtLakhs(allocated)}</span>
                     <span className="text-gray-400">Utilized:</span>
-                    <span className="text-white text-right">₹{utilized.toLocaleString('en-IN')}L</span>
+                    <span className="text-white text-right">{fmtLakhs(utilized)}</span>
                     <span className="text-gray-400">Utilization:</span>
-                    <span className="text-right font-bold" style={{ color }}>{utilPct !== null ? `${utilPct}%` : 'N/A'}</span>
+                    <span className="text-right font-bold" style={{ color }}>{fmtPct(utilPct)}</span>
                   </div>
                 </div>
               </Tooltip>

@@ -142,15 +142,16 @@ async def get_low_utilization_alerts(
 
     results = []
     for sp, scheme, district, dept in rows:
-        severity = "critical" if (sp.utilization_pct or 0) < 20 else "warning"
+        # The query keeps only rows with a known utilisation_pct and allocation.
+        severity = "critical" if sp.utilization_pct < 20 else "warning"
         results.append(LowUtilizationAlert(
             scheme_name=scheme.name,
             scheme_code=scheme.code,
             district_name=district.name,
             department_name=dept.name,
-            funds_allocated_lakhs=sp.funds_allocated or 0,
-            funds_utilized_lakhs=sp.funds_utilized or 0,
-            utilization_pct=sp.utilization_pct or 0,
+            funds_allocated_lakhs=sp.funds_allocated,
+            funds_utilized_lakhs=sp.funds_utilized,
+            utilization_pct=sp.utilization_pct,
             severity=severity,
             snapshot_date=sp.snapshot_date,
         ))

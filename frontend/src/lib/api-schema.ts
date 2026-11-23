@@ -711,8 +711,11 @@ export interface components {
             contractor_name: string;
             /** Total Tenders Won */
             total_tenders_won: number;
-            /** Total Awarded Lakhs */
-            total_awarded_lakhs: number;
+            /**
+             * Total Awarded Lakhs
+             * @description ₹ lakhs; null when no awarded amount is known
+             */
+            total_awarded_lakhs: number | null;
         };
         /** DBTDistrictGap */
         DBTDistrictGap: {
@@ -723,15 +726,18 @@ export interface components {
             /** District Code */
             district_code: string;
             /** Beneficiaries Enrolled */
-            beneficiaries_enrolled: number;
+            beneficiaries_enrolled: number | null;
             /** Beneficiaries Paid */
-            beneficiaries_paid: number;
+            beneficiaries_paid: number | null;
             /** Amount Transferred Lakhs */
-            amount_transferred_lakhs: number;
+            amount_transferred_lakhs: number | null;
             /** Last Mile Gap Pct */
-            last_mile_gap_pct: number;
+            last_mile_gap_pct: number | null;
         };
-        /** DBTSchemeSummary */
+        /**
+         * DBTSchemeSummary
+         * @description Totals over the districts with a known figure; null when no district has one (unknown, not 0).
+         */
         DBTSchemeSummary: {
             /** Scheme Id */
             scheme_id: number;
@@ -742,13 +748,16 @@ export interface components {
             /** Financial Year */
             financial_year: string;
             /** Total Beneficiaries Enrolled */
-            total_beneficiaries_enrolled: number;
+            total_beneficiaries_enrolled: number | null;
             /** Total Beneficiaries Paid */
-            total_beneficiaries_paid: number;
+            total_beneficiaries_paid: number | null;
             /** Total Amount Transferred Lakhs */
-            total_amount_transferred_lakhs: number;
-            /** Overall Gap Pct */
-            overall_gap_pct: number;
+            total_amount_transferred_lakhs: number | null;
+            /**
+             * Overall Gap Pct
+             * @description null when enrolled or paid is unknown
+             */
+            overall_gap_pct: number | null;
         };
         /** DepartmentDetail */
         DepartmentDetail: {
@@ -1170,8 +1179,11 @@ export interface components {
             department_name: string;
             /** Funds Allocated Lakhs */
             funds_allocated_lakhs: number;
-            /** Funds Utilized Lakhs */
-            funds_utilized_lakhs: number;
+            /**
+             * Funds Utilized Lakhs
+             * @description ₹ lakhs; null when not collected
+             */
+            funds_utilized_lakhs: number | null;
             /** Utilization Pct */
             utilization_pct: number;
             /**
@@ -1386,7 +1398,7 @@ export interface components {
         };
         /**
          * SchemeHistoryPoint
-         * @description One data point in the spending velocity time-series.
+         * @description One data point in the spending velocity time-series. Null amounts are unknown, not 0.
          */
         SchemeHistoryPoint: {
             /**
@@ -1395,9 +1407,9 @@ export interface components {
              */
             snapshot_date: string;
             /** Funds Allocated Lakhs */
-            funds_allocated_lakhs: number;
+            funds_allocated_lakhs: number | null;
             /** Funds Utilized Lakhs */
-            funds_utilized_lakhs: number;
+            funds_utilized_lakhs: number | null;
             /** Utilization Pct */
             utilization_pct: number | null;
         };

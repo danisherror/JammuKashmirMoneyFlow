@@ -1996,8 +1996,16 @@
             "title": "Total Tenders Won"
           },
           "total_awarded_lakhs": {
-            "type": "integer",
-            "title": "Total Awarded Lakhs"
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total Awarded Lakhs",
+            "description": "₹ lakhs; null when no awarded amount is known"
           }
         },
         "type": "object",
@@ -2023,19 +2031,47 @@
             "title": "District Code"
           },
           "beneficiaries_enrolled": {
-            "type": "integer",
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Beneficiaries Enrolled"
           },
           "beneficiaries_paid": {
-            "type": "integer",
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Beneficiaries Paid"
           },
           "amount_transferred_lakhs": {
-            "type": "integer",
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Amount Transferred Lakhs"
           },
           "last_mile_gap_pct": {
-            "type": "number",
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Last Mile Gap Pct"
           }
         },
@@ -2070,20 +2106,49 @@
             "title": "Financial Year"
           },
           "total_beneficiaries_enrolled": {
-            "type": "integer",
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Total Beneficiaries Enrolled"
           },
           "total_beneficiaries_paid": {
-            "type": "integer",
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Total Beneficiaries Paid"
           },
           "total_amount_transferred_lakhs": {
-            "type": "integer",
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Total Amount Transferred Lakhs"
           },
           "overall_gap_pct": {
-            "type": "number",
-            "title": "Overall Gap Pct"
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Overall Gap Pct",
+            "description": "null when enrolled or paid is unknown"
           }
         },
         "type": "object",
@@ -2097,7 +2162,8 @@
           "total_amount_transferred_lakhs",
           "overall_gap_pct"
         ],
-        "title": "DBTSchemeSummary"
+        "title": "DBTSchemeSummary",
+        "description": "Totals over the districts with a known figure; null when no district has one (unknown, not 0)."
       },
       "DepartmentDetail": {
         "properties": {
@@ -3375,8 +3441,16 @@
             "title": "Funds Allocated Lakhs"
           },
           "funds_utilized_lakhs": {
-            "type": "integer",
-            "title": "Funds Utilized Lakhs"
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Funds Utilized Lakhs",
+            "description": "₹ lakhs; null when not collected"
           },
           "utilization_pct": {
             "type": "number",
@@ -4020,11 +4094,25 @@
             "title": "Snapshot Date"
           },
           "funds_allocated_lakhs": {
-            "type": "integer",
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Funds Allocated Lakhs"
           },
           "funds_utilized_lakhs": {
-            "type": "integer",
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Funds Utilized Lakhs"
           },
           "utilization_pct": {
@@ -4047,7 +4135,7 @@
           "utilization_pct"
         ],
         "title": "SchemeHistoryPoint",
-        "description": "One data point in the spending velocity time-series."
+        "description": "One data point in the spending velocity time-series. Null amounts are unknown, not 0."
       },
       "SchemeSummary": {
         "properties": {

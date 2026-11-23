@@ -25,6 +25,7 @@ from sqlalchemy import select
 
 from collectors.base_collector import BaseCollector
 from database.models import SchemeProgress, Scheme, District
+from processors.data_cleaner import apportion, parse_int, percent
 
 # ── API endpoints ─────────────────────────────────────────────────────────────
 
@@ -123,8 +124,9 @@ class JJMCollector(BaseCollector):
     def _fetch_fund_utilization(self) -> dict:
         """
         Call the JJM fund utilization API for J&K.
-        Returns {"allocated": int, "released": int, "utilized": int} in lakhs.
-        Raises ValueError if response is empty.
+        Returns {"allocated": int, "released": int | None, "utilized": int | None} in lakhs;
+        None when the response has no such figure (unknown, not 0).
+        Raises ValueError if there is no allocation figure.
         """
         params = {"stateCode": JK_STATE_CODE}
         logger.info(f"[jjm] Fetching fund utilization from {FUND_API}")
@@ -139,11 +141,12 @@ class JJMCollector(BaseCollector):
             raise ValueError(f"JJM fund API returned unexpected type: {type(data)}")
 
         # Try all known key variants — the API has changed key names in past versions
-        def pick(d: dict, *keys, default=0) -> int:
+        def pick(d: dict, *keys) -> int | None:
             for k in keys:
-                if k in d and d[k] is not None:
-                    return int(float(str(d[k]).replace(",", "")))
-            return default
+                value = parse_int(d.get(k))
+                if value is not None:
+                    return value
+            return None
 
         result = {
             "allocated": pick(data,
@@ -157,9 +160,9 @@ class JJMCollector(BaseCollector):
                 "Utilized", "expenditure", "utilized"),
         }
 
-        if result["allocated"] == 0:
+        if not result["allocated"]:
             raise ValueError(
-                f"JJM fund API returned allocated=0 for J&K. "
+                f"JJM fund API returned no allocation (got {result['allocated']!r}) for J&K. "
                 f"Available keys in response: {list(data.keys())}"
             )
 
@@ -210,15 +213,13 @@ class JJMCollector(BaseCollector):
                 logger.debug(f"[jjm] No district match for name: '{name}'")
                 continue
 
-            def get_int(d, *keys) -> int:
+            def get_int(d, *keys) -> int | None:
+                """First key with a number; None (unknown) when none has one."""
                 for k in keys:
-                    v = d.get(k)
-                    if v is not None:
-                        try:
-                            return int(float(str(v).replace(",", "")))
-                        except (ValueError, TypeError):
-                            pass
-                return 0
+                    value = parse_int(d.get(k))
+                    if value is not None:
+                        return value
+                return None
 
             results.append({
                 "district_code":     our_code,
@@ -253,13 +254,17 @@ class JJMCollector(BaseCollector):
     ):
         """
         Upsert SchemeProgress. Funds apportioned by district household share
-        because the fund API only gives J&K state totals.
+        because the fund API only gives J&K state totals. If any district's household count is
+        unknown the shares can't be worked out, so every district's funds are stored as unknown.
         """
         today      = date.today()
-        total_hh   = sum(r.get("total_hh", 0) for r in district_rows)
+        hh_counts  = [r.get("total_hh") for r in district_rows]
+        total_hh   = sum(hh_counts) if None not in hh_counts else None
 
         if total_hh == 0:
             raise ValueError("[jjm] Total households across all districts is 0 — cannot apportion funds")
+        if total_hh is None:
+            logger.warning("[jjm] Some districts have no household count — district funds stored as unknown")
 
         for row in district_rows:
             district = self.db.execute(
@@ -270,17 +275,17 @@ class JJMCollector(BaseCollector):
                 self.skip(f"district {row['district_code']} not in DB")
                 continue
 
-            dist_hh    = row.get("total_hh", 0)
-            hh_tap     = row.get("hh_with_tap", 0)
-            share      = dist_hh / total_hh if total_hh > 0 else 0
+            dist_hh    = row.get("total_hh")
+            hh_tap     = row.get("hh_with_tap")
+            share      = dist_hh / total_hh if total_hh else None
 
-            dist_allocated = int(fund_totals.get("allocated", 0) * share)
-            dist_released  = int(fund_totals.get("released",  0) * share)
-            dist_utilized  = int(fund_totals.get("utilized",  0) * share)
+            dist_allocated = apportion(fund_totals.get("allocated"), share)
+            dist_released  = apportion(fund_totals.get("released"),  share)
+            dist_utilized  = apportion(fund_totals.get("utilized"),  share)
 
-            physical_pct = round(hh_tap          / dist_hh       * 100, 2) if dist_hh        > 0 else None
-            util_pct     = round(dist_utilized   / dist_allocated * 100, 2) if dist_allocated > 0 else None
-            release_pct  = round(dist_released   / dist_allocated * 100, 2) if dist_allocated > 0 else None
+            physical_pct = percent(hh_tap,        dist_hh)
+            util_pct     = percent(dist_utilized, dist_allocated)
+            release_pct  = percent(dist_released, dist_allocated)
 
             existing = self.db.execute(
                 select(SchemeProgress).where(

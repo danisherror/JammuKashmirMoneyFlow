@@ -66,7 +66,7 @@ async def contractor_leaderboard(
         .where(Tender.status == "awarded")
         .where(Tender.contractor_name.isnot(None))
         .group_by(Tender.contractor_name)
-        .order_by(desc("total_awarded"))
+        .order_by(func.sum(Tender.awarded_cost).is_(None), desc("total_awarded"))
         .limit(limit)
     )
     
@@ -76,7 +76,7 @@ async def contractor_leaderboard(
         ContractorLeaderboardItem(
             contractor_name=row.contractor_name,
             total_tenders_won=row.tenders_won,
-            total_awarded_lakhs=int(row.total_awarded or 0),
+            total_awarded_lakhs=int(row.total_awarded) if row.total_awarded is not None else None,
         )
         for row in rows
     ]

@@ -11,6 +11,7 @@ from sqlalchemy import select
 from database.models import (
     SchemeProgress, DBTTransfer
 )
+from processors.data_cleaner import percent
 
 
 def recalculate_all_gaps(db: Session, financial_year: str = "2024-25"):
@@ -38,20 +39,12 @@ def _recalculate_scheme_gaps(db: Session, financial_year: str):
         )
     ).scalars().all()
 
+    # An unknown (NULL) figure gives an unknown percentage, never 0% (todo.md 1.3).
     updated = 0
     for record in records:
-        alloc = record.funds_allocated or 0
-        released = record.funds_released or 0
-        utilized = record.funds_utilized or 0
-        target = record.target_physical or 0
-        achieved = record.achieved_physical or 0
-
-        if alloc > 0:
-            record.utilization_pct = round((utilized / alloc) * 100, 2)
-            record.release_pct = round((released / alloc) * 100, 2)
-        if target > 0:
-            record.physical_pct = round((achieved / target) * 100, 2)
-
+        record.utilization_pct = percent(record.funds_utilized, record.funds_allocated)
+        record.release_pct = percent(record.funds_released, record.funds_allocated)
+        record.physical_pct = percent(record.achieved_physical, record.target_physical)
         updated += 1
 
     logger.info(f"[gap_calculator] Recalculated gaps for {updated} scheme progress records")
@@ -67,11 +60,14 @@ def _recalculate_dbt_gaps(db: Session, financial_year: str):
     ).scalars().all()
 
     for record in records:
-        enrolled = record.beneficiaries_enrolled or 0
-        paid = record.beneficiaries_paid or 0
-        if enrolled > 0:
-            gap = ((enrolled - paid) / enrolled) * 100
-            record.last_mile_gap_pct = round(gap, 2)
+        record.last_mile_gap_pct = last_mile_gap_pct(record.beneficiaries_enrolled, record.beneficiaries_paid)
+
+
+def last_mile_gap_pct(enrolled: int | None, paid: int | None) -> float | None:
+    """(enrolled − paid) / enrolled × 100; None when either count is unknown or nobody is enrolled."""
+    if enrolled is None or paid is None or enrolled <= 0:
+        return None
+    return round((enrolled - paid) / enrolled * 100, 2)
 
 
 def _flag_low_utilization(db: Session, financial_year: str):

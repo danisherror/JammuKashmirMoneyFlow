@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { useAppStore } from '../store'
 import { fetchLowUtilAlerts, fetchCAGFindings, fetchAccountabilityFlags, fetchSyncStatus, LowUtilizationAlert, CAGFinding } from '../lib/api'
 import FlagList from '../components/FlagList'
-import { fmtLakhs, fmtPct } from '../lib/utils'
+import { fmtLakhs, fmtPct, sumKnown } from '../lib/utils'
 import PageHeader from '../components/PageHeader'
 import ErrorBox from '../components/ErrorBox'
 import { ExternalLink, AlertTriangle, TrendingDown, FileText } from 'lucide-react'
@@ -173,7 +173,7 @@ export default function Alerts() {
   const flagYear = flags[0]?.financial_year
 
   const highCount  = (cagFindings || []).filter(f => f.severity === 'high').length
-  const totalFlags = (cagFindings || []).reduce((s, f) => s + (f.amount_flagged_lakhs || 0), 0)
+  const totalFlags = sumKnown((cagFindings || []).map(f => f.amount_flagged_lakhs))   // null → "—", not ₹0
 
   return (
     <div className="flex flex-col h-full">

@@ -24,6 +24,23 @@ export function fmtLakhs(v: number | null | undefined): string {
   return `${sign}₹${abs.toLocaleString('en-IN', { maximumFractionDigits: 2 })} L`
 }
 
+/** Format a count (people, transactions) with Indian digit grouping; "—" when unknown. A real 0 shows as "0". */
+export function fmtCount(v: number | null | undefined): string {
+  if (isMissing(v)) return '—'
+  return v.toLocaleString('en-IN')
+}
+
+/** a − b, or null when either is unknown (an unknown figure never counts as 0). */
+export function difference(a: number | null | undefined, b: number | null | undefined): number | null {
+  return isMissing(a) || isMissing(b) ? null : a - b
+}
+
+/** Sum of the known values; null when none is known, so "no data" doesn't show as ₹0. */
+export function sumKnown(values: Array<number | null | undefined>): number | null {
+  const known = values.filter((v): v is number => !isMissing(v))
+  return known.length ? known.reduce((s, v) => s + v, 0) : null
+}
+
 /** Format a percentage value that is already on a 0–100 scale. */
 export function fmtPct(v: number | null | undefined, digits = 1): string {
   if (isMissing(v)) return '—'

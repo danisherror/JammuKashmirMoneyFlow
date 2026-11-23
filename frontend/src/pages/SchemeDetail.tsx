@@ -34,12 +34,13 @@ export default function SchemeDetail() {
 
   const districtChartData = data?.district_progress
     .slice()
-    .sort((a, b) => (b.utilization_pct ?? 0) - (a.utilization_pct ?? 0))
+    .sort((a, b) => (b.utilization_pct ?? -1) - (a.utilization_pct ?? -1))   // unknown last
     .slice(0, 15)
     .map(d => ({
       name: d.district_code,
-      utilized: d.utilization_pct ?? 0,
-      physical: d.physical_pct ?? 0,
+      // null leaves the bar out; an unknown figure must not draw as 0% (todo.md 1.3)
+      utilized: d.utilization_pct,
+      physical: d.physical_pct,
       fullName: d.district_name,
     })) ?? []
 
@@ -149,17 +150,20 @@ export default function SchemeDetail() {
                       <YAxis domain={[0, 100]} tick={{ fill: '#5a7a9a', fontSize: 9, fontFamily: 'Space Mono' }}
                         tickFormatter={v => `${v}%`} />
                       <Tooltip
-                        formatter={(v: number, name: string) => [`${v.toFixed(1)}%`, name === 'utilized' ? 'Financial' : 'Physical']}
+                        formatter={(v: number, name: string) => [fmtPct(v), name === 'utilized' ? 'Financial' : 'Physical']}
                         contentStyle={{ background: '#0d1520', border: '1px solid #1a2a3a', fontFamily: 'Space Mono', fontSize: 10 }}
                       />
                       <Bar dataKey="utilized" name="utilized">
-                        {districtChartData.map((d, i) => (
-                          <Cell key={i}
-                            fill={d.utilized >= 75 ? 'rgba(0,255,136,0.6)' : d.utilized >= 40 ? 'rgba(255,215,0,0.6)' : 'rgba(255,51,102,0.6)'}
-                            stroke={d.utilized >= 75 ? '#00ff88' : d.utilized >= 40 ? '#ffd700' : '#ff3366'}
-                            strokeWidth={1}
-                          />
-                        ))}
+                        {districtChartData.map((d, i) => {
+                          const pct = d.utilized ?? 0   // colour only; a null bar isn't drawn
+                          return (
+                            <Cell key={i}
+                              fill={pct >= 75 ? 'rgba(0,255,136,0.6)' : pct >= 40 ? 'rgba(255,215,0,0.6)' : 'rgba(255,51,102,0.6)'}
+                              stroke={pct >= 75 ? '#00ff88' : pct >= 40 ? '#ffd700' : '#ff3366'}
+                              strokeWidth={1}
+                            />
+                          )
+                        })}
                       </Bar>
                     </BarChart>
                   </ResponsiveContainer>

@@ -70,7 +70,7 @@ export default function DistrictDetail() {
             <div className="panel">
               <div className="panel-title">OVERALL FUND ABSORPTION</div>
               <UtilBar
-                allocated={data.total_funds_allocated_lakhs ?? 0}
+                allocated={data.total_funds_allocated_lakhs}
                 utilized={data.total_funds_utilized_lakhs}
               />
             </div>
@@ -91,7 +91,7 @@ export default function DistrictDetail() {
                         </span>
                       </div>
                       <UtilBar
-                        allocated={sp.funds_allocated_lakhs ?? 0}
+                        allocated={sp.funds_allocated_lakhs}
                         released={sp.funds_released_lakhs}
                         utilized={sp.funds_utilized_lakhs}
                         showLabels={false}

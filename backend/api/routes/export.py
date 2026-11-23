@@ -16,6 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
 from database.connection import get_db
+from processors.data_cleaner import percent
 from database.models import (
     SchemeProgress, Scheme, District, Department,
     Tender, DBTTransfer, BudgetAllocation, Expenditure,
@@ -254,7 +255,7 @@ async def export_gap_analysis(
         .where(Expenditure.financial_year == financial_year)
         .group_by(Expenditure.department_id)
     )).all()
-    exp_map = {r.department_id: (r.total or 0) for r in exp_rows}
+    exp_map = {r.department_id: r.total for r in exp_rows}
 
     pfms_rows = (await db.execute(
         select(Scheme.department_id, sqlfunc.sum(SchemeProgress.funds_released).label("total"))
@@ -262,28 +263,29 @@ async def export_gap_analysis(
         .where(SchemeProgress.financial_year == financial_year)
         .group_by(Scheme.department_id)
     )).all()
-    pfms_map = {r.department_id: (r.total or 0) for r in pfms_rows}
+    pfms_map = {r.department_id: r.total for r in pfms_rows}
 
+    # Unknown figures stay blank in the CSV, never 0; a missing release is not assumed to equal the
+    # allocation (todo.md 1.3).
     output_rows = []
     for dept, alloc in rows:
-        utilized = exp_map.get(dept.id, 0)
-        budget = alloc.budget_estimate or 0
-        released = pfms_map.get(dept.id, 0)
-        effective_release = max(released, budget) if released == 0 else released
-        gap = effective_release - utilized
-        util_pct = round((utilized / budget * 100), 2) if budget > 0 else 0
+        utilized = exp_map.get(dept.id)
+        budget = alloc.budget_estimate
+        released = pfms_map.get(dept.id)
+        gap = released - utilized if released is not None and utilized is not None else None
         output_rows.append({
             "department": dept.name,
             "department_code": dept.code,
             "division": dept.division,
             "financial_year": financial_year,
             "allocated_lakhs": budget,
-            "released_lakhs": effective_release,
+            "released_lakhs": released,
             "utilized_lakhs": utilized,
             "gap_lakhs": gap,
-            "utilization_pct": util_pct,
+            "utilization_pct": percent(utilized, budget),
+            "is_demo": alloc.is_demo,
         })
-    output_rows.sort(key=lambda x: x["gap_lakhs"], reverse=True)
+    output_rows.sort(key=lambda x: (x["gap_lakhs"] is not None, x["gap_lakhs"] or 0), reverse=True)
     return csv_response(output_rows, f"jk_gap_analysis_{financial_year.replace('-','_')}.csv")
 
 

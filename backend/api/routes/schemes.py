@@ -266,10 +266,10 @@ async def get_scheme_velocity(
     history = [
         SchemeHistoryPoint(
             snapshot_date=r.snapshot_date,
-            funds_allocated_lakhs=int(r.allocated or 0),
-            funds_utilized_lakhs=int(r.utilized or 0),
+            funds_allocated_lakhs=to_int(r.allocated),
+            funds_utilized_lakhs=to_int(r.utilized),
             utilization_pct=round((r.utilized / r.allocated * 100), 2)
-            if r.allocated and r.allocated > 0 else None,
+            if r.utilized is not None and r.allocated and r.allocated > 0 else None,
         )
         for r in rows
     ]
@@ -304,8 +304,10 @@ async def get_scheme_velocity(
     surrender_risk   = None
     verdict          = "NO DATA"
 
-    if history:
-        latest = history[-1]
+    total_allocated = None
+    latest = history[-1] if history else None
+    # A projection needs both figures; with either unknown the verdict stays NO DATA, not a fake 0.
+    if latest and latest.funds_utilized_lakhs is not None and latest.funds_allocated_lakhs is not None:
         current_utilized  = latest.funds_utilized_lakhs
         total_allocated   = latest.funds_allocated_lakhs
 
@@ -323,8 +325,8 @@ async def get_scheme_velocity(
                 shortfall_pct = (total_allocated - projected) / total_allocated * 100 if total_allocated else 0
                 surrender_risk = max(0, total_allocated - projected)
                 verdict = "CRITICAL" if shortfall_pct > 40 else "AT RISK"
-    else:
-        total_allocated = None
+    elif latest:
+        total_allocated = latest.funds_allocated_lakhs
 
     return SchemeVelocity(
         scheme_id=scheme_id,
@@ -333,7 +335,7 @@ async def get_scheme_velocity(
         history=history,
         days_elapsed=days_elapsed,
         days_remaining=days_remaining,
-        daily_run_rate_lakhs=round(daily_run_rate, 2) if daily_run_rate else None,
+        daily_run_rate_lakhs=round(daily_run_rate, 2) if daily_run_rate is not None else None,
         projected_utilized_lakhs=projected,
         total_allocated_lakhs=total_allocated,
         on_track=on_track,

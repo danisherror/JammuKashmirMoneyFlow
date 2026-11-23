@@ -10,6 +10,7 @@ from sqlalchemy import select, func, desc
 from database.connection import get_db
 from database.models import DBTTransfer, Scheme, District
 from api.schemas import DBTSchemeSummary, DBTDistrictGap
+from processors.gap_calculator import last_mile_gap_pct
 
 router = APIRouter(prefix="/dbt", tags=["DBT"])
 
@@ -50,11 +51,10 @@ async def list_dbt_schemes(
     rows = (await db.execute(query)).all()
     results = []
 
+    # SUM skips NULLs and is NULL when every district's figure is unknown: unknown stays null, not 0.
     for r in rows:
-        enrolled = r.total_enrolled or 0
-        paid = r.total_paid or 0
-        gap_pct = ((enrolled - paid) / enrolled * 100) if enrolled > 0 else 0.0
-
+        enrolled = to_int(r.total_enrolled)
+        paid = to_int(r.total_paid)
         results.append(DBTSchemeSummary(
             scheme_id=r.id,
             scheme_name=r.name,
@@ -62,11 +62,16 @@ async def list_dbt_schemes(
             financial_year=financial_year,
             total_beneficiaries_enrolled=enrolled,
             total_beneficiaries_paid=paid,
-            total_amount_transferred_lakhs=int(r.total_amount or 0),
-            overall_gap_pct=round(gap_pct, 2),
+            total_amount_transferred_lakhs=to_int(r.total_amount),
+            overall_gap_pct=last_mile_gap_pct(enrolled, paid),
         ))
 
-    return sorted(results, key=lambda x: x.total_beneficiaries_enrolled, reverse=True)
+    # Most enrolled first; unknown enrolment last.
+    return sorted(
+        results,
+        key=lambda x: (x.total_beneficiaries_enrolled is not None, x.total_beneficiaries_enrolled or 0),
+        reverse=True,
+    )
 
 
 @router.get("/schemes/{scheme_id}/gap", response_model=list[DBTDistrictGap])
@@ -98,7 +103,7 @@ async def dbt_scheme_gap(
             DBTTransfer.scheme_id == scheme_id,
             DBTTransfer.financial_year == financial_year
         )
-        .order_by(desc(DBTTransfer.last_mile_gap_pct))
+        .order_by(DBTTransfer.last_mile_gap_pct.is_(None), desc(DBTTransfer.last_mile_gap_pct))
     )
 
     rows = (await db.execute(query)).all()
@@ -108,10 +113,14 @@ async def dbt_scheme_gap(
             district_id=district.id,
             district_name=district.name,
             district_code=district.code,
-            beneficiaries_enrolled=dbt.beneficiaries_enrolled or 0,
-            beneficiaries_paid=dbt.beneficiaries_paid or 0,
-            amount_transferred_lakhs=dbt.amount_transferred or 0,
-            last_mile_gap_pct=round(dbt.last_mile_gap_pct or 0.0, 2),
+            beneficiaries_enrolled=dbt.beneficiaries_enrolled,
+            beneficiaries_paid=dbt.beneficiaries_paid,
+            amount_transferred_lakhs=dbt.amount_transferred,
+            last_mile_gap_pct=round(dbt.last_mile_gap_pct, 2) if dbt.last_mile_gap_pct is not None else None,
         )
         for dbt, district in rows
     ]
+
+
+def to_int(value) -> int | None:
+    return int(value) if value is not None else None

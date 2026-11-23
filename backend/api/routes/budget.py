@@ -247,7 +247,7 @@ async def get_gap_analysis(
         .where(SchemeProgress.financial_year == financial_year, Scheme.department_id.in_(list(figures)))
         .group_by(Scheme.department_id)
     )).all()
-    pfms = {r.department_id: r for r in pfms_rows if r.total}
+    pfms = {r.department_id: r for r in pfms_rows if r.total is not None}   # a real 0 release is kept
 
     results = []
     for dept in departments:

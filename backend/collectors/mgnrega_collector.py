@@ -28,6 +28,7 @@ from bs4 import BeautifulSoup
 
 from collectors.base_collector import BaseCollector
 from database.models import SchemeProgress, Scheme, District
+from processors.data_cleaner import apportion, parse_int, percent
 
 
 # ── Endpoints ─────────────────────────────────────────────────────────────────
@@ -210,25 +211,26 @@ class MGNREGACollector(BaseCollector):
                 logger.debug(f"[mgnrega] Unmatched district name: '{district_raw}'")
                 continue
 
-            def safe_int(val: str) -> int:
-                cleaned = re.sub(r"[^\d.]", "", val)
-                return int(float(cleaned)) if cleaned else 0
-
             # Column positions vary slightly by year; use position offsets from district col
             try:
                 # Typical order after district name:
                 # HH_registered, HH_demanded, HH_provided, person_days, sc_days, st_days, women_days
+                # A missing column is unknown (None), not 0 (todo.md 1.3).
                 num_cols = [c for c in cols if c and re.search(r"\d", c)]
+
+                def col(i: int) -> int | None:
+                    return parse_int(num_cols[i]) if len(num_cols) > i else None
+
                 results.append({
                     "district_code":            our_code,
                     "district_name":            district_raw,
-                    "hh_registered":            safe_int(num_cols[0]) if len(num_cols) > 0 else 0,
-                    "hh_demanded":              safe_int(num_cols[1]) if len(num_cols) > 1 else 0,
-                    "hh_provided_employment":   safe_int(num_cols[2]) if len(num_cols) > 2 else 0,
-                    "person_days_generated":    safe_int(num_cols[3]) if len(num_cols) > 3 else 0,
-                    "sc_person_days":           safe_int(num_cols[4]) if len(num_cols) > 4 else 0,
-                    "st_person_days":           safe_int(num_cols[5]) if len(num_cols) > 5 else 0,
-                    "women_person_days":        safe_int(num_cols[6]) if len(num_cols) > 6 else 0,
+                    "hh_registered":            col(0),
+                    "hh_demanded":              col(1),
+                    "hh_provided_employment":   col(2),
+                    "person_days_generated":    col(3),
+                    "sc_person_days":           col(4),
+                    "st_person_days":           col(5),
+                    "women_person_days":        col(6),
                 })
             except (IndexError, ValueError) as e:
                 logger.warning(f"[mgnrega] Column parse error for '{district_raw}': {e}")
@@ -269,9 +271,9 @@ class MGNREGACollector(BaseCollector):
                                 "utilized":  nums[2],
                             }
 
-        # If no totals row found, sum all numeric cells in the last meaningful row
-        logger.warning("[mgnrega] Could not find totals row in fund statement — returning zeros")
-        return {"allocated": 0, "released": 0, "utilized": 0}
+        # No totals row: the fund figures are unknown, not zero.
+        logger.warning("[mgnrega] Could not find totals row in fund statement — funds unknown")
+        return {"allocated": None, "released": None, "utilized": None}
 
     # ── Save ──────────────────────────────────────────────────────────────────
 
@@ -284,10 +286,12 @@ class MGNREGACollector(BaseCollector):
         """
         Upsert SchemeProgress rows. One row per district per snapshot_date.
         Funds are apportioned to districts proportional to person-days generated,
-        because the fund statement only gives J&K state totals.
+        because the fund statement only gives J&K state totals. If any district's person-days are
+        unknown the shares can't be worked out, so every district's funds are stored as unknown.
         """
         today = date.today()
-        total_person_days = sum(r.get("person_days_generated", 0) for r in district_rows)
+        person_days_all = [r.get("person_days_generated") for r in district_rows]
+        total_person_days = sum(person_days_all) if None not in person_days_all else None
         if total_person_days == 0:
             raise ValueError("[mgnrega] Total person_days is 0 — cannot apportion funds")
 
@@ -300,19 +304,19 @@ class MGNREGACollector(BaseCollector):
                 self.skip(f"district {row['district_code']} not in DB")
                 continue
 
-            person_days  = row.get("person_days_generated", 0)
-            share        = person_days / total_person_days
+            person_days  = row.get("person_days_generated")
+            share        = person_days / total_person_days if total_person_days else None
 
-            dist_allocated = int(fund_totals.get("allocated", 0) * share)
-            dist_released  = int(fund_totals.get("released",  0) * share)
-            dist_utilized  = int(fund_totals.get("utilized",  0) * share)
+            dist_allocated = apportion(fund_totals.get("allocated"), share)
+            dist_released  = apportion(fund_totals.get("released"),  share)
+            dist_utilized  = apportion(fund_totals.get("utilized"),  share)
 
-            hh_demanded = row.get("hh_demanded", 0)
-            hh_provided = row.get("hh_provided_employment", 0)
+            hh_demanded = row.get("hh_demanded")
+            hh_provided = row.get("hh_provided_employment")
 
-            util_pct     = round(dist_utilized  / dist_allocated * 100, 2) if dist_allocated > 0 else None
-            release_pct  = round(dist_released  / dist_allocated * 100, 2) if dist_allocated > 0 else None
-            physical_pct = round(hh_provided    / hh_demanded    * 100, 2) if hh_demanded   > 0 else None
+            util_pct     = percent(dist_utilized, dist_allocated)
+            release_pct  = percent(dist_released, dist_allocated)
+            physical_pct = percent(hh_provided,   hh_demanded)
 
             existing = self.db.execute(
                 select(SchemeProgress).where(
