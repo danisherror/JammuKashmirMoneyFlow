@@ -7,6 +7,7 @@ import ErrorBox from '../components/ErrorBox'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts'
 import { Search } from 'lucide-react'
 import CollectorSource from '../components/CollectorSource'
+import NoCollectedData from '../components/NoCollectedData'
 
 export default function Tenders() {
   const [searchTerm, setSearchTerm] = useState('')
@@ -83,6 +84,10 @@ export default function Tenders() {
           <div className="flex-1 p-4 relative">
             {loadingLeaderboard ? (
               <div className="absolute inset-0 flex items-center justify-center mono text-[10px] text-dim animate-pulse">Loading Leaderboard...</div>
+            ) : !leaderboard || leaderboard.length === 0 ? (
+              <div className="absolute inset-0 flex items-center justify-center p-6 text-center">
+                <NoCollectedData collectors={['tenders_collector']} />
+              </div>
             ) : (
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={leaderboard || []} layout="vertical" margin={{ top: 0, right: 30, left: 10, bottom: 0 }}>
@@ -147,8 +152,18 @@ export default function Tenders() {
                     <tr>
                       <td colSpan={6} className="p-8 text-center text-dim animate-pulse">Loading Tenders...</td>
                     </tr>
+                  ) : !tenders || tenders.length === 0 ? (
+                    <tr>
+                      <td colSpan={6} className="p-8 text-center">
+                        <NoCollectedData collectors={['tenders_collector']} />
+                      </td>
+                    </tr>
+                  ) : filteredTenders.length === 0 ? (
+                    <tr>
+                      <td colSpan={6} className="p-8 text-center text-dim">No tenders match this search or department.</td>
+                    </tr>
                   ) : (
-                    filteredTenders.map((t, i) => {
+                    filteredTenders.map((t) => {
                       const est = t.estimated_cost_lakhs
                       const awd = t.awarded_cost_lakhs
                       const diff = (est && awd) ? awd - est : 0

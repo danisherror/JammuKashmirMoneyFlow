@@ -13,6 +13,8 @@ import ErrorBox from '../components/ErrorBox'
 import MapWidget from '../components/MapWidget'
 import VelocityChart from '../components/VelocityChart'
 import { ChevronLeft, ExternalLink } from 'lucide-react'
+import NoCollectedData from '../components/NoCollectedData'
+import { collectorsForScheme } from '../lib/collectors'
 
 export default function SchemeDetail() {
   const { id } = useParams<{ id: string }>()
@@ -212,9 +214,7 @@ export default function SchemeDetail() {
 
             {data.district_progress.length === 0 && (
               <div className="panel p-6 text-center">
-                <div className="mono text-[10px] text-dim">
-                  District-wise data will populate after the next scheduled collector run (daily 6AM IST).
-                </div>
+                <NoCollectedData collectors={collectorsForScheme(data.code)} />
               </div>
             )}
           </>

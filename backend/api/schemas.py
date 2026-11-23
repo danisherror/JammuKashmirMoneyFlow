@@ -384,7 +384,7 @@ class DistrictHeatmapItem(BaseModel):
     active_schemes_count: int
     # For map coloring
     absorption_score: Optional[float]         # 0-100 normalized score
-    absorption_grade: AbsorptionGrade
+    absorption_grade: Optional[AbsorptionGrade] = Field(description="null when the district has no data")
 
     class Config:
         from_attributes = True

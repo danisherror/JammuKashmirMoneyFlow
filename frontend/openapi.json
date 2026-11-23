@@ -2457,15 +2457,23 @@
             "title": "Absorption Score"
           },
           "absorption_grade": {
-            "type": "string",
-            "enum": [
-              "A",
-              "B",
-              "C",
-              "D",
-              "F"
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "A",
+                  "B",
+                  "C",
+                  "D",
+                  "F"
+                ]
+              },
+              {
+                "type": "null"
+              }
             ],
-            "title": "Absorption Grade"
+            "title": "Absorption Grade",
+            "description": "null when the district has no data"
           },
           "scheme_progress": {
             "items": {
@@ -2585,15 +2593,23 @@
             "title": "Absorption Score"
           },
           "absorption_grade": {
-            "type": "string",
-            "enum": [
-              "A",
-              "B",
-              "C",
-              "D",
-              "F"
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "A",
+                  "B",
+                  "C",
+                  "D",
+                  "F"
+                ]
+              },
+              {
+                "type": "null"
+              }
             ],
-            "title": "Absorption Grade"
+            "title": "Absorption Grade",
+            "description": "null when the district has no data"
           }
         },
         "type": "object",

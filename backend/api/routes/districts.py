@@ -15,7 +15,10 @@ from api.schemas import DistrictHeatmapItem, DistrictDetail
 router = APIRouter(prefix="/districts", tags=["Districts"])
 
 
-def _absorption_grade(score: float) -> str:
+def _absorption_grade(score: float | None) -> str | None:
+    """Letter grade for an absorption score; None (no data) when there is no score, never "F"."""
+    if score is None:
+        return None
     if score >= 80:
         return "A"
     if score >= 60:
@@ -60,8 +63,9 @@ async def get_district_heatmap(
 
     results = []
     for district in districts:
+        # A district with no collected rows has unknown figures (null), not 0% and grade F.
         agg = agg_map.get(district.id)
-        avg_util = round(agg.avg_util or 0, 2) if agg else 0.0
+        avg_util = round(agg.avg_util, 2) if agg and agg.avg_util is not None else None
 
         results.append(DistrictHeatmapItem(
             id=district.id,
@@ -71,14 +75,15 @@ async def get_district_heatmap(
             population=district.population,
             is_border_district=district.is_border_district,
             avg_utilization_pct=avg_util,
-            total_funds_allocated_lakhs=int(agg.total_alloc or 0) if agg else 0,
-            total_funds_utilized_lakhs=int(agg.total_util or 0) if agg else 0,
+            total_funds_allocated_lakhs=int(agg.total_alloc) if agg and agg.total_alloc is not None else None,
+            total_funds_utilized_lakhs=int(agg.total_util) if agg and agg.total_util is not None else None,
             active_schemes_count=int(agg.scheme_count or 0) if agg else 0,
             absorption_score=avg_util,
             absorption_grade=_absorption_grade(avg_util),
         ))
 
-    results.sort(key=lambda x: x.absorption_score or 0, reverse=True)
+    # Highest score first; districts with no data last.
+    results.sort(key=lambda x: (x.absorption_score is not None, x.absorption_score or 0), reverse=True)
     return results
 
 
@@ -146,12 +151,15 @@ async def get_district_detail(
                 scheme_code=scheme.code,
             ))
 
-    total_allocated = sum(s.funds_allocated_lakhs or 0 for s in scheme_progress_list)
-    total_utilized = sum(s.funds_utilized_lakhs or 0 for s in scheme_progress_list)
-    avg_util = (
-        sum(s.utilization_pct or 0 for s in scheme_progress_list) / len(scheme_progress_list)
-        if scheme_progress_list else 0
-    )
+    def known_sum(values):
+        known = [v for v in values if v is not None]
+        return sum(known) if known else None
+
+    # Unknown (null) figures are left out of totals and averages; with none known the result is null.
+    total_allocated = known_sum(s.funds_allocated_lakhs for s in scheme_progress_list)
+    total_utilized = known_sum(s.funds_utilized_lakhs for s in scheme_progress_list)
+    utils = [s.utilization_pct for s in scheme_progress_list if s.utilization_pct is not None]
+    avg_util = round(sum(utils) / len(utils), 2) if utils else None
 
     return DistrictDetail(
         id=district.id,
@@ -160,11 +168,11 @@ async def get_district_detail(
         division=district.division,
         population=district.population,
         is_border_district=district.is_border_district,
-        avg_utilization_pct=round(avg_util, 2),
+        avg_utilization_pct=avg_util,
         total_funds_allocated_lakhs=total_allocated,
         total_funds_utilized_lakhs=total_utilized,
         active_schemes_count=len(scheme_progress_list),
-        absorption_score=round(avg_util, 2),
+        absorption_score=avg_util,
         absorption_grade=_absorption_grade(avg_util),
         scheme_progress=scheme_progress_list,
     )

@@ -8,6 +8,7 @@ import LoadingGrid from '../components/LoadingGrid'
 import ErrorBox from '../components/ErrorBox'
 import CollectorSource from '../components/CollectorSource'
 import { SCHEME_PROGRESS_COLLECTORS } from '../lib/collectors'
+import NoCollectedData from '../components/NoCollectedData'
 
 export default function Districts() {
   const { financialYear } = useAppStore()
@@ -29,7 +30,7 @@ export default function Districts() {
       </div>
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
         {(districts ?? []).map(d => {
-          const score = d.absorption_score ?? 0
+          const score = d.absorption_score
           const gColor = gradeColor(d.absorption_grade)
           return (
             <div
@@ -42,8 +43,9 @@ export default function Districts() {
               <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 2, background: gColor }} />
 
               {/* Grade badge */}
-              <div className="absolute top-2 right-2 display text-2xl" style={{ color: gColor }}>
-                {d.absorption_grade}
+              <div className="absolute top-2 right-2 display text-2xl" style={{ color: gColor }}
+                title={d.absorption_grade ? undefined : 'No data'}>
+                {d.absorption_grade ?? '—'}
               </div>
 
               <div className="mono text-[10px] font-bold text-white group-hover:text-gold transition-colors pr-8">
@@ -56,9 +58,13 @@ export default function Districts() {
               <div className="mt-3 mb-1">
                 {/* Score bar */}
                 <div className="h-1 w-full mb-1" style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid #1a2a3a' }}>
-                  <div className="h-full" style={{ width: `${score}%`, background: gColor, transition: 'width 1s' }} />
+                  {score != null && (
+                    <div className="h-full" style={{ width: `${Math.min(score, 100)}%`, background: gColor, transition: 'width 1s' }} />
+                  )}
                 </div>
-                <div className="mono text-[9px]" style={{ color: gColor }}>{fmtPct(score)} absorption</div>
+                <div className="mono text-[9px]" style={{ color: gColor }}>
+                  {score != null ? `${fmtPct(score)} absorption` : 'No data'}
+                </div>
               </div>
 
               <div className="space-y-0.5 mt-2">
@@ -109,6 +115,11 @@ export default function Districts() {
         {isLoading ? <LoadingGrid count={20} /> :
          isError   ? <ErrorBox /> : (
           <>
+            {(data ?? []).every(d => d.absorption_score == null) && (
+              <div className="panel p-4">
+                <NoCollectedData collectors={SCHEME_PROGRESS_COLLECTORS} />
+              </div>
+            )}
             <DivSection title="KASHMIR DIVISION" districts={kashmir} />
             <DivSection title="JAMMU DIVISION"   districts={jammu} />
           </>

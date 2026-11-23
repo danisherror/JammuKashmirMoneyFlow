@@ -8,6 +8,7 @@ import ErrorBox from '../components/ErrorBox'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend } from 'recharts'
 import { ChevronRight } from 'lucide-react'
 import CollectorSource from '../components/CollectorSource'
+import NoCollectedData from '../components/NoCollectedData'
 
 export default function DBT() {
   const { financialYear } = useAppStore()
@@ -50,6 +51,9 @@ export default function DBT() {
           <div className="flex-1 overflow-auto space-y-2 pr-2 custom-scrollbar">
             {loadingSchemes && <div className="text-dim mono text-[10px] animate-pulse">Loading schemes...</div>}
             {errorSchemes && <ErrorBox />}
+            {!loadingSchemes && !errorSchemes && schemes?.length === 0 && (
+              <NoCollectedData collectors={['dbt_collector']} className="p-3 border border-[#1a2a3a]" />
+            )}
             
             {(schemes || []).map(s => {
               const isSelected = selectedScheme?.scheme_id === s.scheme_id
@@ -124,7 +128,9 @@ export default function DBT() {
               {loadingGaps ? (
                 <div className="h-full flex items-center justify-center mono text-[10px] text-dim animate-pulse">Loading District Data...</div>
               ) : !gaps || gaps.length === 0 ? (
-                <div className="h-full flex items-center justify-center mono text-[10px] text-dim">No district data available.</div>
+                <div className="h-full flex items-center justify-center p-6 text-center">
+                  <NoCollectedData collectors={['dbt_collector']} />
+                </div>
               ) : (
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={gaps} margin={{ top: 20, right: 30, left: 20, bottom: 60 }}>

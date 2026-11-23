@@ -1,14 +1,15 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useAppStore } from '../store'
-import { fetchLowUtilAlerts, fetchCAGFindings, fetchAccountabilityFlags, LowUtilizationAlert, CAGFinding } from '../lib/api'
+import { fetchLowUtilAlerts, fetchCAGFindings, fetchAccountabilityFlags, fetchSyncStatus, LowUtilizationAlert, CAGFinding } from '../lib/api'
 import FlagList from '../components/FlagList'
 import { fmtLakhs, fmtPct } from '../lib/utils'
 import PageHeader from '../components/PageHeader'
 import ErrorBox from '../components/ErrorBox'
 import { ExternalLink, AlertTriangle, TrendingDown, FileText } from 'lucide-react'
 import CollectorSource from '../components/CollectorSource'
-import { SCHEME_PROGRESS_COLLECTORS } from '../lib/collectors'
+import { SCHEME_PROGRESS_COLLECTORS, neverCollected, pickCollectors } from '../lib/collectors'
+import NoCollectedData from '../components/NoCollectedData'
 
 // ── Low Utilization Alert Row ─────────────────────────────────────────────────
 
@@ -150,6 +151,8 @@ export default function Alerts() {
     queryFn: () => fetchLowUtilAlerts(financialYear),
   })
 
+  const { data: syncStatus } = useQuery({ queryKey: ['sync-status'], queryFn: fetchSyncStatus, refetchInterval: 60_000 })
+
   const { data: cagFindings, isLoading: loadingCAG, isError: errCAG } = useQuery({
     queryKey: ['cag-findings'],
     queryFn: () => fetchCAGFindings(50),
@@ -237,8 +240,12 @@ export default function Alerts() {
           <div className="flex-1 overflow-auto px-4 py-2 custom-scrollbar">
             {loadingUtil && <div className="mono text-[9px] text-dim animate-pulse py-4">Loading alerts...</div>}
             {errUtil && <ErrorBox />}
-            {(utilAlerts || []).length === 0 && !loadingUtil && (
-              <div className="mono text-[9px] text-dim py-4">No utilization flags. All schemes are on track!</div>
+            {(utilAlerts || []).length === 0 && !loadingUtil && !errUtil && (
+              neverCollected(pickCollectors(syncStatus, SCHEME_PROGRESS_COLLECTORS))
+                ? <NoCollectedData collectors={SCHEME_PROGRESS_COLLECTORS} className="py-4" />
+                : <div className="mono text-[9px] text-dim py-4">
+                    No scheme-district below 40% utilisation in the data collected for FY {financialYear}.
+                  </div>
             )}
             {(utilAlerts || []).map((a, i) => <UtilRow key={i} a={a} />)}
           </div>
@@ -257,10 +264,7 @@ export default function Alerts() {
             {errCAG && <ErrorBox />}
             {(cagFindings || []).length === 0 && !loadingCAG && (
               <div className="panel p-6 text-center">
-                <div className="mono text-[10px] text-dim mb-2">No CAG findings yet.</div>
-                <div className="mono text-[9px] text-dim">
-                  Trigger the <span className="text-white">CAG Audit Collector</span> from the Sync Status page.
-                </div>
+                <NoCollectedData collectors={['cag_collector']} />
               </div>
             )}
             {(cagFindings || []).map(f => <CAGCard key={f.id} f={f} />)}

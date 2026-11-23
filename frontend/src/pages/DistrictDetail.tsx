@@ -9,6 +9,7 @@ import ErrorBox from '../components/ErrorBox'
 import { ChevronLeft } from 'lucide-react'
 import CollectorSource from '../components/CollectorSource'
 import { SCHEME_PROGRESS_COLLECTORS } from '../lib/collectors'
+import NoCollectedData from '../components/NoCollectedData'
 
 export default function DistrictDetail() {
   const { id } = useParams<{ id: string }>()
@@ -44,7 +45,7 @@ export default function DistrictDetail() {
           <>
             <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
               {[
-                { label: 'ABSORPTION GRADE', val: data.absorption_grade, color: gColor, isText: true },
+                { label: 'ABSORPTION GRADE', val: data.absorption_grade ?? '—', color: gColor, isText: true },
                 { label: 'AVG UTILIZATION', val: fmtPct(data.avg_utilization_pct), color: gColor, isText: true },
                 { label: 'TOTAL ALLOCATED', val: fmtLakhs(data.total_funds_allocated_lakhs), color: '#00aaff', isText: true },
                 { label: 'TOTAL UTILIZED', val: fmtLakhs(data.total_funds_utilized_lakhs), color: gColor, isText: true },
@@ -69,7 +70,7 @@ export default function DistrictDetail() {
             <div className="panel">
               <div className="panel-title">OVERALL FUND ABSORPTION</div>
               <UtilBar
-                allocated={data.total_funds_allocated_lakhs ?? 1}
+                allocated={data.total_funds_allocated_lakhs ?? 0}
                 utilized={data.total_funds_utilized_lakhs}
               />
             </div>
@@ -90,7 +91,7 @@ export default function DistrictDetail() {
                         </span>
                       </div>
                       <UtilBar
-                        allocated={sp.funds_allocated_lakhs ?? 1}
+                        allocated={sp.funds_allocated_lakhs ?? 0}
                         released={sp.funds_released_lakhs}
                         utilized={sp.funds_utilized_lakhs}
                         showLabels={false}
@@ -107,9 +108,7 @@ export default function DistrictDetail() {
 
             {(!data.scheme_progress || data.scheme_progress.length === 0) && (
               <div className="panel p-6 text-center">
-                <div className="mono text-[10px] text-dim">
-                  Scheme-wise data will populate after the first collector run.
-                </div>
+                <NoCollectedData collectors={SCHEME_PROGRESS_COLLECTORS} />
               </div>
             )}
           </>

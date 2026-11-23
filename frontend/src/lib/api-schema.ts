@@ -854,9 +854,9 @@ export interface components {
             absorption_score: number | null;
             /**
              * Absorption Grade
-             * @enum {string}
+             * @description null when the district has no data
              */
-            absorption_grade: "A" | "B" | "C" | "D" | "F";
+            absorption_grade: ("A" | "B" | "C" | "D" | "F") | null;
             /**
              * Scheme Progress
              * @default []
@@ -890,9 +890,9 @@ export interface components {
             absorption_score: number | null;
             /**
              * Absorption Grade
-             * @enum {string}
+             * @description null when the district has no data
              */
-            absorption_grade: "A" | "B" | "C" | "D" | "F";
+            absorption_grade: ("A" | "B" | "C" | "D" | "F") | null;
         };
         /**
          * DivisionEnum
