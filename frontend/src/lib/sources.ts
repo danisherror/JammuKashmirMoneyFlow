@@ -110,3 +110,12 @@ export function mismatchText(source: FigureSource | null | undefined): string | 
 export function pageRef(source: FigureSource | null | undefined): string | null {
   return source?.page != null ? `p.${source.page}` : null
 }
+
+/**
+ * Download link for the saved copy of a figure's source document (GET /snapshots/{id}, todo.md 1.4),
+ * or null when the figure has no snapshot. `apiBase` is the API base URL including /api/v1.
+ */
+export function snapshotUrl(snapshotId: number | null | undefined, apiBase: string): string | null {
+  if (snapshotId == null) return null
+  return `${apiBase.replace(/\/+$/, '')}/snapshots/${snapshotId}`
+}

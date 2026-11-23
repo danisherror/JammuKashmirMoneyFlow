@@ -70,6 +70,20 @@ class FigureSource(BaseModel):
     mismatch: Optional[MismatchInfo] = None
 
 
+class SnapshotInfo(BaseModel):
+    """A saved source document (GET /api/v1/snapshots/{id}/meta)."""
+    id: int
+    source_type: str
+    collector_name: Optional[str] = Field(description="Collector or loader that fetched it")
+    title: Optional[str]
+    source_url: str = Field(description="Where it was fetched from")
+    fetched_at: datetime
+    sha256: str = Field(description="SHA-256 of the stored bytes; the download is checked against it")
+    content_type: Optional[str]
+    byte_size: int
+    download_url: str = Field(description="Path of the raw file, e.g. /api/v1/snapshots/12")
+
+
 class Sourced(BaseModel):
     """Mixin: which view produced the response, and a FigureSource per figure field."""
     view: ViewEnum = ViewEnum.COMBINED

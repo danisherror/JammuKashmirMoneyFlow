@@ -1608,6 +1608,90 @@
         }
       }
     },
+    "/api/v1/snapshots/{snapshot_id}/meta": {
+      "get": {
+        "tags": [
+          "Snapshots"
+        ],
+        "summary": "Get Snapshot Meta",
+        "operationId": "get_snapshot_meta_api_v1_snapshots__snapshot_id__meta_get",
+        "parameters": [
+          {
+            "name": "snapshot_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Snapshot Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SnapshotInfo"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/snapshots/{snapshot_id}": {
+      "get": {
+        "tags": [
+          "Snapshots"
+        ],
+        "summary": "Download Snapshot",
+        "description": "The raw file. Its SHA-256 is checked before it is served, so a corrupted or replaced file is\nnever passed off as the original.",
+        "operationId": "download_snapshot_api_v1_snapshots__snapshot_id__get",
+        "parameters": [
+          {
+            "name": "snapshot_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Snapshot Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The stored file; its SHA-256 is in the X-Content-SHA256 header"
+          },
+          "404": {
+            "description": "No such snapshot, or its file is missing from storage"
+          },
+          "500": {
+            "description": "The stored file no longer matches its recorded SHA-256"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/health": {
       "get": {
         "summary": "Health",
@@ -4475,6 +4559,91 @@
         ],
         "title": "SectionBlockItem",
         "description": "One Voted/Charged block at the top of a grant's pages (₹ lakhs)."
+      },
+      "SnapshotInfo": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "source_type": {
+            "type": "string",
+            "title": "Source Type"
+          },
+          "collector_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Collector Name",
+            "description": "Collector or loader that fetched it"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          },
+          "source_url": {
+            "type": "string",
+            "title": "Source Url",
+            "description": "Where it was fetched from"
+          },
+          "fetched_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Fetched At"
+          },
+          "sha256": {
+            "type": "string",
+            "title": "Sha256",
+            "description": "SHA-256 of the stored bytes; the download is checked against it"
+          },
+          "content_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Content Type"
+          },
+          "byte_size": {
+            "type": "integer",
+            "title": "Byte Size"
+          },
+          "download_url": {
+            "type": "string",
+            "title": "Download Url",
+            "description": "Path of the raw file, e.g. /api/v1/snapshots/12"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "source_type",
+          "collector_name",
+          "title",
+          "source_url",
+          "fetched_at",
+          "sha256",
+          "content_type",
+          "byte_size",
+          "download_url"
+        ],
+        "title": "SnapshotInfo",
+        "description": "A saved source document (GET /api/v1/snapshots/{id}/meta)."
       },
       "SyncStatusItem": {
         "properties": {

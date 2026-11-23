@@ -1,10 +1,10 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { format, parseISO } from 'date-fns'
-import { ExternalLink } from 'lucide-react'
+import { Download, ExternalLink } from 'lucide-react'
 import clsx from 'clsx'
-import type { FigureSource } from '../lib/api'
-import { badgeText, measureLabel, mismatchText, pageRef, sourceKind, type SourceKind } from '../lib/sources'
+import { API_BASE, type FigureSource } from '../lib/api'
+import { badgeText, measureLabel, mismatchText, pageRef, snapshotUrl, sourceKind, type SourceKind } from '../lib/sources'
 
 const STYLES: Record<SourceKind, string> = {
   official: 'text-emerald-300 bg-emerald-500/10 border-emerald-500/30',
@@ -67,6 +67,7 @@ export default function SourceBadge({ source, value, className }: Props) {
   const measure = measureLabel(source)
   const page = pageRef(source)
   const fetched = source?.fetched_at ? format(parseISO(source.fetched_at), 'd MMM yyyy, HH:mm') : null
+  const savedCopy = snapshotUrl(source?.snapshot_id, API_BASE)
 
   return (
     <>
@@ -124,6 +125,15 @@ export default function SourceBadge({ source, value, className }: Props) {
               className="mt-2 inline-flex items-center gap-1 text-[10px] font-semibold text-sky-400 hover:text-sky-300"
             >
               <ExternalLink size={10} /> Open source document{page ? ` (${page})` : ''}
+            </a>
+          )}
+          {savedCopy && (
+            <a
+              href={savedCopy}
+              className="mt-1 flex items-center gap-1 text-[10px] font-semibold text-sky-400 hover:text-sky-300"
+              title="The exact file this figure was read from, as fetched; its SHA-256 is checked on download"
+            >
+              <Download size={10} /> Download saved copy
             </a>
           )}
         </div>,

@@ -111,6 +111,9 @@ const post = async <T>(url: string, params?: Record<string, unknown>): Promise<T
 
 export const fetchHealth = () => get<HealthResponse>('/health')
 
+/** Base URL of the API (including /api/v1), for plain links such as snapshot downloads. */
+export const API_BASE: string = api.defaults.baseURL ?? '/api/v1'
+
 // Budget
 // Budget and scheme routes take `view` (todo.md 2.2a); the backend defaults to combined.
 export const fetchBudgetOverview = (financialYear: string, view?: View) =>

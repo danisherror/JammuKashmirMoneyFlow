@@ -8,6 +8,7 @@ import {
   pageRef,
   parseView,
   searchWithView,
+  snapshotUrl,
   sourceKind,
 } from './sources'
 
@@ -103,5 +104,14 @@ describe('pageRef', () => {
   it('formats a page', () => {
     expect(pageRef(base)).toBe('p.9')
     expect(pageRef({ ...base, page: null })).toBeNull()
+  })
+})
+
+describe('snapshotUrl', () => {
+  it('links to the saved copy when there is one', () => {
+    expect(snapshotUrl(12, '/api/v1')).toBe('/api/v1/snapshots/12')
+    expect(snapshotUrl(3, 'http://localhost:8000/api/v1/')).toBe('http://localhost:8000/api/v1/snapshots/3')
+    expect(snapshotUrl(null, '/api/v1')).toBeNull()
+    expect(snapshotUrl(undefined, '/api/v1')).toBeNull()
   })
 })

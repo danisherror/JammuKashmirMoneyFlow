@@ -586,6 +586,44 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/snapshots/{snapshot_id}/meta": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Snapshot Meta */
+        get: operations["get_snapshot_meta_api_v1_snapshots__snapshot_id__meta_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/snapshots/{snapshot_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Download Snapshot
+         * @description The raw file. Its SHA-256 is checked before it is served, so a corrupted or replaced file is
+         *     never passed off as the original.
+         */
+        get: operations["download_snapshot_api_v1_snapshots__snapshot_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/health": {
         parameters: {
             query?: never;
@@ -1523,6 +1561,47 @@ export interface components {
             /** Surrendered Lakhs */
             surrendered_lakhs: number;
             source: components["schemas"]["FigureSource"];
+        };
+        /**
+         * SnapshotInfo
+         * @description A saved source document (GET /api/v1/snapshots/{id}/meta).
+         */
+        SnapshotInfo: {
+            /** Id */
+            id: number;
+            /** Source Type */
+            source_type: string;
+            /**
+             * Collector Name
+             * @description Collector or loader that fetched it
+             */
+            collector_name: string | null;
+            /** Title */
+            title: string | null;
+            /**
+             * Source Url
+             * @description Where it was fetched from
+             */
+            source_url: string;
+            /**
+             * Fetched At
+             * Format: date-time
+             */
+            fetched_at: string;
+            /**
+             * Sha256
+             * @description SHA-256 of the stored bytes; the download is checked against it
+             */
+            sha256: string;
+            /** Content Type */
+            content_type: string | null;
+            /** Byte Size */
+            byte_size: number;
+            /**
+             * Download Url
+             * @description Path of the raw file, e.g. /api/v1/snapshots/12
+             */
+            download_url: string;
         };
         /** SyncStatusItem */
         SyncStatusItem: {
@@ -2516,6 +2595,80 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
+            };
+        };
+    };
+    get_snapshot_meta_api_v1_snapshots__snapshot_id__meta_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                snapshot_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SnapshotInfo"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    download_snapshot_api_v1_snapshots__snapshot_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                snapshot_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The stored file; its SHA-256 is in the X-Content-SHA256 header */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description No such snapshot, or its file is missing from storage */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description The stored file no longer matches its recorded SHA-256 */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
