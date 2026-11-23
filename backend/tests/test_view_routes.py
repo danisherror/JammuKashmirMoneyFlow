@@ -3,7 +3,6 @@
 Appropriation Accounts fixture is loaded into SQLite, with hand-made live rows beside it.
 """
 from datetime import date, datetime, timezone
-from pathlib import Path
 
 import pytest
 from fastapi import FastAPI
@@ -29,8 +28,8 @@ from database.models import (
     SourceSnapshot,
 )
 from loaders.appropriation_accounts import load_appropriation_accounts
+from tests.pdf_fixtures import accounts_pdf
 
-FIXTURE = Path(__file__).parent / "fixtures" / "appropriation_accounts" / "jk-appropriation-2022-23-summary.pdf"
 URL = "https://cag.gov.in/example-2022-23.pdf"
 FETCHED = datetime(2026, 11, 22, tzinfo=timezone.utc)
 YEAR = "2022-23"
@@ -52,7 +51,9 @@ def setup(tmp_path):
     Base.metadata.create_all(sync_engine)
 
     with Session(sync_engine) as db:
-        load_appropriation_accounts(db, FIXTURE.read_bytes(), URL, tmp_path / "snapshots", fetched_at=FETCHED)
+        load_appropriation_accounts(
+            db, accounts_pdf(YEAR), URL, tmp_path / "snapshots", fetched_at=FETCHED, partial_details=True
+        )
 
         pwd = Department(name="Public Works", code="PWD", division=DivisionType.CENTRAL)
         health = Department(name="Health", code="HEALTH", division=DivisionType.CENTRAL)

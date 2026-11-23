@@ -1,11 +1,16 @@
 """
-Load the J&K Appropriation Accounts (CAG) into `appropriation_account_lines`.
+Load the J&K Appropriation Accounts (CAG) into the database.
+
+Tables filled from one PDF: `appropriation_account_lines` (summary table) and, from the grant
+pages, `appropriation_major_heads`, `appropriation_section_blocks`, `appropriation_notes`,
+`appropriation_head_lines` and `appropriation_document_issues`.
 
 Steps, all-or-nothing per document:
   1. download the PDF (or read a local copy),
-  2. parse and validate it (parsers.appropriation_accounts) — a document that fails is never stored,
+  2. parse and validate it (parsers.appropriation_accounts for the summary, then
+     parsers.appropriation_details for the grant pages) — a document that fails is never stored,
   3. save the bytes to <raw_snapshot_dir>/appropriation_accounts/<sha256>.pdf,
-  4. in one transaction, record the snapshot and replace that year's rows.
+  4. in one transaction, record the snapshot and replace that year's rows in every table.
 
 Re-loading the same file is a no-op. Loading a different file for a year already loaded (e.g. a
 reissued PDF) replaces that year's rows and keeps the old snapshot row for the record.
@@ -26,8 +31,17 @@ from pathlib import Path
 from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
-from database.models import AppropriationAccountLine, SourceSnapshot
+from database.models import (
+    AppropriationAccountLine,
+    AppropriationDocumentIssue,
+    AppropriationHeadLine,
+    AppropriationMajorHead,
+    AppropriationNote,
+    AppropriationSectionBlock,
+    SourceSnapshot,
+)
 from parsers.appropriation_accounts import parse_appropriation_summary
+from parsers.appropriation_details import AppropriationDetails, parse_appropriation_details
 
 SOURCE_TYPE = "appropriation_accounts"
 
@@ -48,7 +62,19 @@ class LoadResult:
     snapshot_id: int
     sha256: str
     status: str  # "inserted" | "replaced" | "unchanged"
-    rows: int
+    rows: int  # summary rows
+    head_rows: int = 0  # note-table rows from the grant pages
+
+
+# Every table holding rows derived from one year's document; all are replaced together.
+YEAR_TABLES = (
+    AppropriationAccountLine,
+    AppropriationMajorHead,
+    AppropriationSectionBlock,
+    AppropriationNote,
+    AppropriationHeadLine,
+    AppropriationDocumentIssue,
+)
 
 
 def fetch_pdf(url: str, timeout: float = 120.0) -> bytes:
@@ -70,12 +96,18 @@ def load_appropriation_accounts(
     snapshot_dir: Path,
     fetched_at: datetime | None = None,
     expected_year: str | None = None,
+    partial_details: bool = False,
 ) -> LoadResult:
-    """Parse, snapshot and store one Appropriation Accounts PDF. Commits on success, rolls back on error."""
+    """Parse, snapshot and store one Appropriation Accounts PDF. Commits on success, rolls back on error.
+
+    `partial_details=True` accepts grant pages for only some grants; it exists for test fixtures,
+    which are cut down from the full PDFs. Real documents must contain every grant.
+    """
     summary = parse_appropriation_summary(io.BytesIO(pdf_bytes))  # raises before anything is written
     year = summary.financial_year
     if expected_year and year != expected_year:
         raise ValueError(f"expected the {expected_year} accounts, but the PDF is for {year}")
+    details = parse_appropriation_details(io.BytesIO(pdf_bytes), summary=summary, partial=partial_details)
 
     sha256 = hashlib.sha256(pdf_bytes).hexdigest()
     relative_path = Path(SOURCE_TYPE) / f"{sha256}.pdf"
@@ -102,17 +134,26 @@ def load_appropriation_accounts(
             db.add(snapshot)
             db.flush()
 
-        existing_snapshots = set(
-            db.execute(
-                select(AppropriationAccountLine.snapshot_id).where(AppropriationAccountLine.financial_year == year)
-            ).scalars()
-        )
-        if existing_snapshots == {snapshot.id}:
+        # Per table, which snapshots this year's rows come from. A table that should have rows but has
+        # none (e.g. a database loaded before the grant-page tables existed) forces a reload.
+        existing = {
+            table: set(db.execute(select(table.snapshot_id).where(table.financial_year == year)).scalars())
+            for table in YEAR_TABLES
+        }
+        expected_tables = {AppropriationAccountLine, AppropriationMajorHead, AppropriationSectionBlock}
+        if details.notes:
+            expected_tables.add(AppropriationNote)
+        if details.heads:
+            expected_tables.add(AppropriationHeadLine)
+        if all(existing[t] == {snapshot.id} for t in expected_tables) and all(
+            existing[t] <= {snapshot.id} for t in YEAR_TABLES
+        ):
             db.commit()
-            return LoadResult(year, snapshot.id, sha256, "unchanged", len(summary.lines))
+            return LoadResult(year, snapshot.id, sha256, "unchanged", len(summary.lines), len(details.heads))
 
-        status = "replaced" if existing_snapshots else "inserted"
-        db.execute(delete(AppropriationAccountLine).where(AppropriationAccountLine.financial_year == year))
+        status = "replaced" if existing[AppropriationAccountLine] else "inserted"
+        for table in YEAR_TABLES:
+            db.execute(delete(table).where(table.financial_year == year))
         db.add_all(
             AppropriationAccountLine(
                 snapshot_id=snapshot.id,
@@ -129,11 +170,100 @@ def load_appropriation_accounts(
             )
             for line in summary.lines
         )
+        db.add_all(_detail_rows(details, snapshot.id))
         db.commit()
-        return LoadResult(year, snapshot.id, sha256, status, len(summary.lines))
+        return LoadResult(year, snapshot.id, sha256, status, len(summary.lines), len(details.heads))
     except Exception:
         db.rollback()
         raise
+
+
+def _detail_rows(details: AppropriationDetails, snapshot_id: int) -> list:
+    year = details.financial_year
+    rows: list = [
+        AppropriationMajorHead(
+            snapshot_id=snapshot_id,
+            financial_year=year,
+            grant_no=m.grant_no,
+            section=m.section,
+            code=m.code,
+            name=m.name,
+            page=m.page,
+        )
+        for m in details.major_heads
+    ]
+    rows += [
+        AppropriationSectionBlock(
+            snapshot_id=snapshot_id,
+            financial_year=year,
+            grant_no=t.grant_no,
+            section=t.section,
+            kind=t.kind,
+            original_thousand=t.original,
+            supplementary_thousand=t.supplementary,
+            reappropriation_thousand=t.reappropriation,
+            final_grant_thousand=t.final_grant,
+            expenditure_thousand=t.expenditure,
+            saving_thousand=t.saving,
+            excess_thousand=t.excess,
+            surrendered_thousand=t.surrendered,
+            page=t.page,
+        )
+        for t in details.section_totals
+    ]
+    rows += [
+        AppropriationNote(
+            snapshot_id=snapshot_id,
+            financial_year=year,
+            grant_no=n.grant_no,
+            section=n.section,
+            kind=n.kind,
+            number=n.number,
+            text=n.text,
+            category=n.category,
+            reasons_not_communicated=n.reasons_not_communicated,
+            page=n.page,
+        )
+        for n in details.notes
+    ]
+    rows += [
+        AppropriationHeadLine(
+            snapshot_id=snapshot_id,
+            financial_year=year,
+            grant_no=h.grant_no,
+            section=h.section,
+            kind=h.kind,
+            note_number=h.note_number,
+            category=h.category,
+            reasons_not_communicated=h.reasons_not_communicated,
+            head_code=h.head_code,
+            major_head_code=h.path[0].code,
+            head_name=h.head_name,
+            head_path=[{"level": p.level, "code": p.code, "name": p.name} for p in h.path],
+            original_thousand=h.original,
+            supplementary_thousand=h.supplementary,
+            reappropriation_thousand=h.reappropriation,
+            final_grant_thousand=h.final_grant,
+            expenditure_thousand=h.expenditure,
+            saving_thousand=h.saving,
+            excess_thousand=h.excess,
+            remark=h.remark,
+            printed_error=h.printed_error,
+            page=h.page,
+        )
+        for h in details.heads
+    ]
+    for kind, texts in (
+        ("skipped_table", details.skipped_tables),
+        ("misfiled", details.misfiled),
+        ("footnote", details.footnotes),
+        ("headerless_table", details.headerless_tables),
+    ):
+        rows += [
+            AppropriationDocumentIssue(snapshot_id=snapshot_id, financial_year=year, kind=kind, text=text)
+            for text in texts
+        ]
+    return rows
 
 
 def _main(argv: list[str] | None = None) -> int:
@@ -172,7 +302,10 @@ def _main(argv: list[str] | None = None) -> int:
             pdf_bytes = content if content is not None else fetch_pdf(url)
             with SyncSessionLocal() as db:
                 result = load_appropriation_accounts(db, pdf_bytes, url, snapshot_dir, expected_year=year)
-            logger.info(f"{result.financial_year}: {result.status}, {result.rows} rows, sha256 {result.sha256[:12]}")
+            logger.info(
+                f"{result.financial_year}: {result.status}, {result.rows} summary rows, "
+                f"{result.head_rows} head rows, sha256 {result.sha256[:12]}"
+            )
         except Exception as exc:  # report every year, then exit non-zero
             failures += 1
             logger.error(f"{year or url}: {exc}")

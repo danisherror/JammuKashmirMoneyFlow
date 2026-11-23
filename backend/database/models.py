@@ -318,6 +318,119 @@ class AppropriationAccountLine(Base):
     snapshot = relationship("SourceSnapshot")
 
 
+# Grant pages of the same PDFs (parsers.appropriation_details), loaded in the same transaction as
+# the summary rows above. Amounts are in ₹ THOUSAND; the notes print ₹ lakh, converted exactly.
+
+class AppropriationMajorHead(Base):
+    """A major head listed on a grant's pages, per section."""
+    __tablename__ = "appropriation_major_heads"
+    __table_args__ = (
+        UniqueConstraint("financial_year", "grant_no", "section", "code", name="uq_appropriation_major_head"),
+    )
+
+    id = Column(Integer, primary_key=True)
+    snapshot_id = Column(Integer, ForeignKey("source_snapshots.id"), index=True, nullable=False)
+    financial_year = Column(String(10), index=True, nullable=False)
+    grant_no = Column(Integer, nullable=False)
+    section = Column(String(10), nullable=False)
+    code = Column(String(4), nullable=False)
+    name = Column(String(300), nullable=False)
+    page = Column(Integer, nullable=False)
+
+
+class AppropriationSectionBlock(Base):
+    """One Voted/Charged block at the top of a grant's pages: original, supplementary, surrendered."""
+    __tablename__ = "appropriation_section_blocks"
+    __table_args__ = (
+        UniqueConstraint("financial_year", "grant_no", "section", "kind", name="uq_appropriation_section_block"),
+    )
+
+    id = Column(Integer, primary_key=True)
+    snapshot_id = Column(Integer, ForeignKey("source_snapshots.id"), index=True, nullable=False)
+    financial_year = Column(String(10), index=True, nullable=False)
+    grant_no = Column(Integer, nullable=False)
+    section = Column(String(10), nullable=False)
+    kind = Column(String(10), nullable=False)
+    original_thousand = Column(BigInteger, nullable=False)
+    supplementary_thousand = Column(BigInteger, nullable=False)
+    reappropriation_thousand = Column(BigInteger, nullable=False)  # printed only in 2021-22
+    final_grant_thousand = Column(BigInteger, nullable=False)
+    expenditure_thousand = Column(BigInteger, nullable=False)
+    saving_thousand = Column(BigInteger, nullable=False)
+    excess_thousand = Column(BigInteger, nullable=False)
+    surrendered_thousand = Column(BigInteger, nullable=False)
+    page = Column(Integer, nullable=False)
+
+
+class AppropriationNote(Base):
+    """A numbered note under "Notes and Comments", verbatim."""
+    __tablename__ = "appropriation_notes"
+    __table_args__ = (UniqueConstraint("financial_year", "grant_no", "number", name="uq_appropriation_note"),)
+
+    id = Column(Integer, primary_key=True)
+    snapshot_id = Column(Integer, ForeignKey("source_snapshots.id"), index=True, nullable=False)
+    financial_year = Column(String(10), index=True, nullable=False)
+    grant_no = Column(Integer, nullable=False)
+    section = Column(String(10), nullable=True)
+    kind = Column(String(10), nullable=True)
+    number = Column(Integer, nullable=False)
+    text = Column(Text, nullable=False)
+    category = Column(String(30), nullable=False)  # saving | excess | unutilised | ... | comment
+    reasons_not_communicated = Column(Boolean, nullable=False)
+    page = Column(Integer, nullable=False)
+
+
+class AppropriationHeadLine(Base):
+    """
+    One row of a note table: a head below the major head with its O / S / R, total grant, actual,
+    saving/excess and the official remark. Amounts the table doesn't print are NULL, not 0.
+    A head can sit in more than one note (e.g. excess and unspent supplementary), hence note_number
+    in the key.
+    """
+    __tablename__ = "appropriation_head_lines"
+    __table_args__ = (
+        UniqueConstraint(
+            "financial_year", "grant_no", "section", "kind", "head_code", "note_number",
+            name="uq_appropriation_head_line",
+        ),
+    )
+
+    id = Column(Integer, primary_key=True)
+    snapshot_id = Column(Integer, ForeignKey("source_snapshots.id"), index=True, nullable=False)
+    financial_year = Column(String(10), index=True, nullable=False)
+    grant_no = Column(Integer, nullable=False)
+    section = Column(String(10), nullable=False)
+    kind = Column(String(10), nullable=False)
+    note_number = Column(Integer, nullable=False)
+    category = Column(String(30), nullable=False)
+    reasons_not_communicated = Column(Boolean, nullable=False)
+    head_code = Column(String(40), nullable=False)        # "2052.090.0099.0431"
+    major_head_code = Column(String(4), nullable=False)
+    head_name = Column(String(300), nullable=False)       # name of the last level
+    head_path = Column(JSON, nullable=False)              # [{"level", "code", "name"}, ...]
+    original_thousand = Column(BigInteger, nullable=True)
+    supplementary_thousand = Column(BigInteger, nullable=True)
+    reappropriation_thousand = Column(BigInteger, nullable=True)
+    final_grant_thousand = Column(BigInteger, nullable=True)
+    expenditure_thousand = Column(BigInteger, nullable=True)
+    saving_thousand = Column(BigInteger, nullable=True)
+    excess_thousand = Column(BigInteger, nullable=True)
+    remark = Column(Text, nullable=False)
+    printed_error = Column(Text, nullable=True)           # figures that don't add up in the PDF itself
+    page = Column(Integer, nullable=False)
+
+
+class AppropriationDocumentIssue(Base):
+    """Things the parser kept aside instead of guessing: non-head tables, misfiled rows, footnotes."""
+    __tablename__ = "appropriation_document_issues"
+
+    id = Column(Integer, primary_key=True)
+    snapshot_id = Column(Integer, ForeignKey("source_snapshots.id"), index=True, nullable=False)
+    financial_year = Column(String(10), index=True, nullable=False)
+    kind = Column(String(30), nullable=False)  # skipped_table | misfiled | footnote | headerless_table
+    text = Column(Text, nullable=False)
+
+
 class GrantDepartmentMap(Base):
     """Which tracker department a numbered grant belongs to, per financial year."""
     __tablename__ = "grant_department_map"
