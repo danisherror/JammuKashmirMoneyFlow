@@ -10,6 +10,7 @@ from loguru import logger
 from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
 from sqlalchemy.orm import Session
 
+from collectors.http_policy import check_robots, http_headers
 from database.models import DataSyncLog, CollectorStatus
 
 
@@ -53,26 +54,20 @@ class BaseCollector(ABC):
         self._records_inserted = 0
         self._records_skipped = 0
         self._skip_reasons: list[str] = []
+        self._robots: dict[str, dict] = {}     # robots.txt result per URL fetched this run
 
     # ── HTTP client setup ─────────────────────────────────────────────────────
 
     def get_http_client(self) -> httpx.Client:
         """
-        Returns a configured httpx client with headers that mimic a browser.
-        Govt portals sometimes block non-browser user agents.
+        httpx client that identifies the tracker honestly (collectors/http_policy.py).
+        Never swap in a browser User-Agent: if a portal refuses ours, fetch_url
+        reports the collector as no_source.
         """
         return httpx.Client(
             timeout=self.request_timeout,
             follow_redirects=True,
-            headers={
-                "User-Agent": (
-                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-                    "AppleWebKit/537.36 (KHTML, like Gecko) "
-                    "Chrome/124.0.0.0 Safari/537.36"
-                ),
-                "Accept": "application/json, text/html, */*",
-                "Accept-Language": "en-IN,en;q=0.9",
-            },
+            headers=http_headers(),
         )
 
     @retry(
@@ -82,9 +77,25 @@ class BaseCollector(ABC):
         reraise=True,
     )
     def fetch_url(self, client: httpx.Client, url: str, **kwargs) -> httpx.Response:
-        """Fetch a URL with automatic retry on timeout/connection errors."""
+        """
+        Fetch a URL with automatic retry on timeout/connection errors, after
+        checking robots.txt. Disallowed by robots.txt, or refused with 401/403,
+        raises SourceUnavailableError (logged as no_source).
+        """
+        robots = check_robots(client, url)
+        self._robots[url] = robots.as_record()
+        if not robots.allowed:
+            raise SourceUnavailableError(
+                f"{robots.robots_url} disallows {url} for our User-Agent "
+                f"(checked {robots.checked_at:%Y-%m-%d})."
+            )
         logger.debug(f"[{self.collector_name}] GET {url}")
         response = client.get(url, **kwargs)
+        if response.status_code in (401, 403):
+            raise SourceUnavailableError(
+                f"{url} refused our honest User-Agent (HTTP {response.status_code}). "
+                "Not retrying with a browser User-Agent (todo.md 1.6)."
+            )
         response.raise_for_status()
         return response
 
@@ -117,12 +128,13 @@ class BaseCollector(ABC):
         self.sync_log.records_fetched = self._records_fetched
         self.sync_log.records_updated = self._records_updated
         self.sync_log.records_inserted = self._records_inserted
+        extra = dict(self.sync_log.extra_info or {})
         if self._records_skipped:
-            self.sync_log.extra_info = {
-                **(self.sync_log.extra_info or {}),
-                "records_skipped": self._records_skipped,
-                "skip_reasons": self._skip_reasons,
-            }
+            extra.update(records_skipped=self._records_skipped, skip_reasons=self._skip_reasons)
+        if self._robots:
+            extra["robots"] = self._robots
+        if extra:
+            self.sync_log.extra_info = extra
         if error:
             self.sync_log.error_message = error[:2000]   # truncate long stack traces
         self.db.commit()

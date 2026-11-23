@@ -9,6 +9,7 @@ source is found and recorded with a URL and date checked, every run is logged
 as `no_source`.
 
 Candidate to check (not yet checked): https://jktenders.gov.in/nicgep/app
+robots.txt: not yet checked.
 """
 from sqlalchemy.orm import Session
 

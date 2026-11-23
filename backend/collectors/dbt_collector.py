@@ -8,6 +8,7 @@ recorded with a URL and date checked (todo.md 2.4), every run is logged as
 `no_source`.
 
 Candidate to check (not yet checked): https://dbtbharat.gov.in/data/statewise
+robots.txt: not yet checked.
 """
 from typing import Optional
 

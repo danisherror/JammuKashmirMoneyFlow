@@ -95,9 +95,11 @@ Money columns are `BigInteger` in lakhs, so anything below ₹1 lakh is truncate
 
 ### 1.6 Collect politely and honestly
 `base_collector.py:43` sends a fake Chrome User-Agent "because govt portals sometimes block non-browser user agents". That contradicts the "respect the portals" ground rule.
-- [ ] Use an honest User-Agent naming the project and a contact URL (e.g. `JKMoneyFlowBot/1.0 (+<repo URL>)`).
-- [ ] Check and honour `robots.txt` for each portal before fetching. Record the result (allowed / disallowed, date checked) next to the source URL.
-- [ ] If a portal blocks the honest UA, mark that collector `no_source`. Don't spoof.
+- [x] Use an honest User-Agent naming the project and a contact URL (e.g. `JKMoneyFlowBot/1.0 (+<repo URL>)`). Done 2026-11-23: `USER_AGENT` in `backend/collectors/http_policy.py`, used by `BaseCollector.get_http_client()` and the Appropriation Accounts loader.
+- [x] Check and honour `robots.txt` for each portal before fetching. Record the result (allowed / disallowed, date checked) next to the source URL. Done 2026-11-23:
+  - `check_robots()` in `http_policy.py` runs before every `BaseCollector.fetch_url` and every loader download, following RFC 9309 (https://www.rfc-editor.org/rfc/rfc9309): 4xx = no rules, 5xx/network error = don't fetch (the run fails), parsed rules cached ≤ 24 h. A disallowed URL raises `SourceUnavailableError` (`no_source`). Each run stores the robots result per URL in `data_sync_log.extra_info.robots`. Tests: `tests/test_http_policy.py`.
+  - Recorded on 2026-11-23: ejalshakti.gov.in → 404, no rules (allowed); cag.gov.in → disallows only `/admin/`, `/en/admin/`, `/hi/admin/` (the `/uploads/` PDFs are allowed); nreganarayan.nic.in → host doesn't resolve, not checked (see 2.1). The four `no_source` portals (PMAY, PFMS, DBT, tenders) say "not yet checked"; check when 2.4 looks at them.
+- [x] If a portal blocks the honest UA, mark that collector `no_source`. Don't spoof. Done 2026-11-23: HTTP 401/403 in `fetch_url` raises `SourceUnavailableError`, with no retry under another User-Agent.
 
 **Done when:** `grep -rn "Mozilla" backend/collectors` returns nothing, and each collector's source comment records its `robots.txt` status.
 

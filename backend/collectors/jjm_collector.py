@@ -10,6 +10,11 @@ JJM API endpoints (discovered via browser network tab on the portal):
   Base: https://ejalshakti.gov.in/jjmreport/JJMIndia.aspx
   The page loads data via AJAX calls to these JSON endpoints.
   State code for J&K: 01
+
+robots.txt: https://ejalshakti.gov.in/robots.txt returned HTTP 404 on
+2026-11-23, i.e. no rules, every path allowed (RFC 9309 §2.3.1.3,
+https://www.rfc-editor.org/rfc/rfc9309#section-2.3.1.3). Re-checked on every
+fetch by BaseCollector.fetch_url.
 """
 import time
 import re

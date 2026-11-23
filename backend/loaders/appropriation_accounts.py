@@ -57,8 +57,9 @@ KNOWN_DOCUMENTS = {
     "2023-24": "https://cag.gov.in/uploads/state_accounts_report/account-report-Appropriation-2023-24-UT-JK-English-28-03-2025-069d791c2d23943-29281571.pdf",
 }
 
-# Identify ourselves honestly; no personal details.
-USER_AGENT = "JKPublicMoneyFlowTracker/0.1 (open-source public-finance research)"
+# Identify ourselves honestly (collectors/http_policy.py). cag.gov.in/robots.txt
+# disallowed only /admin/, /en/admin/ and /hi/admin/ when checked on 2026-11-23,
+# so the /uploads/ PDFs may be fetched; fetch_pdf re-checks it every time.
 
 
 @dataclass(frozen=True)
@@ -89,7 +90,12 @@ YEAR_TABLES = (
 def fetch_pdf(url: str, timeout: float = 120.0) -> bytes:
     import httpx
 
-    with httpx.Client(timeout=timeout, follow_redirects=True, headers={"User-Agent": USER_AGENT}) as client:
+    from collectors.http_policy import check_robots, http_headers
+
+    with httpx.Client(timeout=timeout, follow_redirects=True, headers=http_headers("application/pdf")) as client:
+        robots = check_robots(client, url)
+        if not robots.allowed:
+            raise PermissionError(f"{robots.robots_url} disallows {url} (checked {robots.checked_at:%Y-%m-%d})")
         response = client.get(url)
         response.raise_for_status()
     content = response.content

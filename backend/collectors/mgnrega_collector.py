@@ -13,6 +13,10 @@ MGNREGA MIS has two useful endpoints for J&K (state_code=01):
 
 Both are public, no login required. The site uses ASP.NET WebForms
 so we request the page, parse the HTML table with BeautifulSoup.
+
+robots.txt: not checked. nreganarayan.nic.in did not resolve on 2026-11-23
+(the host itself is in question, todo.md 2.1). BaseCollector.fetch_url checks
+robots.txt before every fetch and won't fetch while it is unreachable.
 """
 import time
 import re
