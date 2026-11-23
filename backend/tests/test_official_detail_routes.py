@@ -227,3 +227,39 @@ def test_breakdown_empty_and_missing_cases(setup):
     # Grant 7 is in the summary but its pages aren't in the fixture.
     data = get(client, "/budget/grants/7/breakdown", financial_year=YEAR)
     assert data["tree"] == [] and "No grant pages" in data["note"]
+
+
+# ── Accountability flags ──────────────────────────────────────────────────────
+
+def test_breakdown_flags_restate_printed_figures(setup):
+    client, ids, snapshot_id = setup
+    flags = get(client, f"/budget/departments/{ids['COOP']}/breakdown", financial_year=YEAR)["flags"]
+    by_kind = {}
+    for f in flags:
+        by_kind.setdefault(f["kind"], []).append(f)
+    # Revenue voted: spent 7,764.90 lakh against 7,525.03 lakh.
+    (excess,) = by_kind["excess_over_grant"]
+    assert (excess["section"], excess["block_kind"], excess["amount_lakhs"]) == ("revenue", "voted", 239.87)
+    # Capital voted: saving 2,031.88 lakh, nothing surrendered.
+    (unsurrendered,) = by_kind["savings_not_surrendered"]
+    assert (unsurrendered["section"], unsurrendered["amount_lakhs"]) == ("capital", 2031.88)
+    # The revenue supplementary (405.34 lakh) was needed: that block ended in excess.
+    assert "supplementary_not_needed" not in by_kind
+    unused = {f["head_code"]: f["amount_lakhs"] for f in by_kind["fully_unutilised"]}
+    assert unused["2425.001.0031.6058"] == 7.71
+    assert all(f["department_id"] == ids["COOP"] and f["grant_name"] for f in flags)
+    assert all(f["source"]["snapshot_id"] == snapshot_id and f["source"]["page"] for f in flags)
+
+
+def test_alerts_list_flags_for_every_grant(setup):
+    client, ids, _ = setup
+    flags = get(client, "/alerts/accountability", financial_year=YEAR)
+    assert {f["grant_no"] for f in flags} <= {1, 2, 24, 31, 36}
+    assert {f["grant_no"] for f in flags if f["kind"] == "savings_not_surrendered"} >= {1, 36}
+    gad = [f for f in flags if f["grant_no"] == 1 and f["kind"] == "savings_not_surrendered"]
+    assert sorted(f["amount_lakhs"] for f in gad) == [701.84, 8581.58, 13411.99]
+    unused = get(client, "/alerts/accountability", financial_year=YEAR, kind="fully_unutilised")
+    assert unused and {f["kind"] for f in unused} == {"fully_unutilised"}
+    assert any(f["head_code"] == "2013.101.0099.0431" and f["amount_lakhs"] == 650.00 for f in unused)
+    assert len(get(client, "/alerts/accountability", financial_year=YEAR, limit=2)) == 2
+    assert get(client, "/alerts/accountability", financial_year="2030-31") == []

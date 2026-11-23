@@ -214,6 +214,26 @@ class DocumentIssueItem(BaseModel):
     text: str
 
 
+class AccountabilityFlag(BaseModel):
+    """A fact worth a citizen's attention, restated from the printed figures (processors.accountability)."""
+    kind: Literal[
+        "excess_over_grant", "savings_not_surrendered", "supplementary_not_needed",
+        "fully_unutilised", "reasons_not_communicated",
+    ]
+    financial_year: str
+    grant_no: int
+    grant_name: str
+    department_id: Optional[int]
+    section: Optional[str] = None
+    block_kind: Optional[str] = Field(None, description="voted | charged")
+    head_code: Optional[str] = None
+    head_name: Optional[str] = None
+    amount_lakhs: Optional[float] = Field(None, description="The amount the flag is about, ₹ lakhs")
+    share_pct: Optional[float] = Field(None, description="reasons_not_communicated: share of commented heads")
+    detail: str
+    source: FigureSource
+
+
 class GrantBreakdown(BaseModel):
     """
     Where a department's (or one grant's) money went, from the grant pages of the CAG Appropriation
@@ -227,6 +247,7 @@ class GrantBreakdown(BaseModel):
     tree: list[HeadNode]
     notes: list[NoteItem]
     issues: list[DocumentIssueItem]
+    flags: list[AccountabilityFlag] = []
     note: Optional[str] = Field(None, description="Why the breakdown is empty, when it is")
 
 

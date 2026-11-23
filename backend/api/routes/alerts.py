@@ -2,6 +2,7 @@
 Alerts routes — sync health, low utilization flags, collector triggers.
 GET  /api/v1/alerts/sync-status
 GET  /api/v1/alerts/low-utilization
+GET  /api/v1/alerts/accountability    (flags from the CAG Appropriation Accounts)
 POST /api/v1/alerts/trigger/{collector_name}  (manual run)
 """
 from fastapi import APIRouter, Depends, Query, HTTPException, BackgroundTasks
@@ -11,7 +12,8 @@ from datetime import datetime, timezone
 
 from database.connection import get_db
 from database.models import DataSyncLog, SchemeProgress, Scheme, District, Department, CollectorStatus
-from api.schemas import SyncStatusItem, LowUtilizationAlert
+from api.schemas import SyncStatusItem, LowUtilizationAlert, AccountabilityFlag
+from api.official import grant_flags, latest_detail_year
 
 router = APIRouter(prefix="/alerts", tags=["Alerts"])
 
@@ -243,3 +245,29 @@ async def get_cag_findings(
         for r in rows
     ]
 
+
+
+@router.get("/accountability", response_model=list[AccountabilityFlag])
+async def get_accountability_flags(
+    financial_year: str | None = Query(
+        None, description="e.g. 2023-24. Default: the latest year with CAG grant pages loaded"
+    ),
+    kind: str | None = Query(
+        None,
+        description="excess_over_grant | savings_not_surrendered | supplementary_not_needed | "
+                    "fully_unutilised | reasons_not_communicated",
+    ),
+    limit: int = Query(500, ge=1, le=5000),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Accountability flags for every grant, computed at query time from the stored grant pages of
+    the CAG Appropriation Accounts (see processors.accountability). Each links to its PDF page.
+    """
+    year = financial_year or await latest_detail_year(db)
+    if year is None:
+        return []
+    flags = await grant_flags(db, year)
+    if kind:
+        flags = [f for f in flags if f.kind == kind]
+    return flags[:limit]

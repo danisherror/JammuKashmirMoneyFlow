@@ -17,6 +17,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.figures import lakhs_from_thousand, pages_label
 from api.schemas import (
+    AccountabilityFlag,
     DocumentIssueItem,
     FigureSource,
     GrantBreakdown,
@@ -38,6 +39,7 @@ from database.models import (
     GrantDepartmentMap,
     SourceSnapshot,
 )
+from processors.accountability import Flag, accountability_flags
 
 
 def _lakhs(thousand: int | None) -> float | None:
@@ -292,6 +294,7 @@ async def grant_breakdown(
     if not blocks:
         return empty.model_copy(update={"note": f"No grant pages loaded for {financial_year}"})
 
+    flags = await grant_flags(db, financial_year, grants, infos)
     head_rows = (await db.execute(
         select(AppropriationHeadLine, SourceSnapshot)
         .join(SourceSnapshot, AppropriationHeadLine.snapshot_id == SourceSnapshot.id)
@@ -341,4 +344,57 @@ async def grant_breakdown(
             for n, snap in notes
         ],
         issues=[DocumentIssueItem(grant_no=i.grant_no, kind=i.kind, page=i.page, text=i.text) for i in issues],
+        flags=flags,
     )
+
+
+# ── Accountability flags ──────────────────────────────────────────────────────
+
+async def grant_flags(
+    db: AsyncSession, financial_year: str, grants: list[int] | None = None, infos: list[GrantInfo] | None = None
+) -> list[AccountabilityFlag]:
+    """Flags for `grants` (every grant when None), each with its PDF page as the source."""
+    block_query = (
+        select(AppropriationSectionBlock, SourceSnapshot)
+        .join(SourceSnapshot, AppropriationSectionBlock.snapshot_id == SourceSnapshot.id)
+        .where(AppropriationSectionBlock.financial_year == financial_year)
+    )
+    head_query = select(AppropriationHeadLine).where(AppropriationHeadLine.financial_year == financial_year)
+    if grants is not None:
+        block_query = block_query.where(AppropriationSectionBlock.grant_no.in_(grants))
+        head_query = head_query.where(AppropriationHeadLine.grant_no.in_(grants))
+    blocks = (await db.execute(block_query)).all()
+    if not blocks:
+        return []
+    snapshot = blocks[0][1]
+    heads = (await db.execute(head_query)).scalars().all()
+    names = {g.grant_no: g for g in (infos if infos is not None else await list_grants(db, financial_year))}
+
+    def item(flag: Flag) -> AccountabilityFlag:
+        info = names.get(flag.grant_no)
+        pages = set(flag.pages) or {flag.page}
+        return AccountabilityFlag(
+            kind=flag.kind,
+            financial_year=financial_year,
+            grant_no=flag.grant_no,
+            grant_name=info.name if info else f"Grant {flag.grant_no}",
+            department_id=info.department_id if info else None,
+            section=flag.section,
+            block_kind=flag.block_kind,
+            head_code=flag.head_code,
+            head_name=flag.head_name,
+            amount_lakhs=_lakhs(flag.amount_thousand),
+            share_pct=flag.share_pct,
+            detail=flag.detail,
+            source=FigureSource(
+                source_type="official",
+                label=f"Official · Appropriation Accounts {financial_year}, {pages_label(pages)}",
+                measure=flag.kind,
+                source_url=snapshot.source_url,
+                snapshot_id=snapshot.id,
+                page=flag.page,
+                fetched_at=snapshot.fetched_at,
+            ),
+        )
+
+    return [item(f) for f in accountability_flags([b for b, _ in blocks], heads)]

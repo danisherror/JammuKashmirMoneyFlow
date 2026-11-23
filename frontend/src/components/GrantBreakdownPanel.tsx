@@ -1,6 +1,7 @@
 import { ExternalLink } from 'lucide-react'
 import type { FigureSource, GrantBreakdown, HeadNode, HeadRowItem } from '../lib/api'
 import { fmtLakhs } from '../lib/utils'
+import FlagList from './FlagList'
 import { biggestUnspent, categoryLabel, headCodePath, nodeTotal, pdfPageUrl } from '../lib/breakdown'
 
 const BORDER = { borderColor: '#1a2a3a' }
@@ -126,6 +127,11 @@ export default function GrantBreakdownPanel({ breakdown, yearNote }: Props) {
             </tbody>
           </table>
         </div>
+      </div>
+
+      <div className="panel">
+        <div className="panel-title">ACCOUNTABILITY FLAGS</div>
+        <FlagList flags={breakdown.flags ?? []} />
       </div>
 
       <div className="panel">

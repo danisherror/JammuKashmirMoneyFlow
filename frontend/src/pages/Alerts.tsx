@@ -1,7 +1,8 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useAppStore } from '../store'
-import { fetchLowUtilAlerts, fetchCAGFindings, LowUtilizationAlert, CAGFinding } from '../lib/api'
+import { fetchLowUtilAlerts, fetchCAGFindings, fetchAccountabilityFlags, LowUtilizationAlert, CAGFinding } from '../lib/api'
+import FlagList from '../components/FlagList'
 import { fmtLakhs, fmtPct } from '../lib/utils'
 import PageHeader from '../components/PageHeader'
 import ErrorBox from '../components/ErrorBox'
@@ -147,6 +148,20 @@ export default function Alerts() {
     queryFn: () => fetchCAGFindings(50),
   })
 
+  // Audited flags for the selected year; the CAG accounts trail by a year, so fall back to the latest loaded.
+  const { data: yearFlags, isLoading: loadingFlags, isError: errFlags } = useQuery({
+    queryKey: ['accountability', financialYear],
+    queryFn: () => fetchAccountabilityFlags(financialYear),
+  })
+  const needLatest = yearFlags !== undefined && yearFlags.length === 0
+  const { data: latestFlags } = useQuery({
+    queryKey: ['accountability', 'latest'],
+    queryFn: () => fetchAccountabilityFlags(),
+    enabled: needLatest,
+  })
+  const flags = needLatest ? latestFlags ?? [] : yearFlags ?? []
+  const flagYear = flags[0]?.financial_year
+
   const highCount  = (cagFindings || []).filter(f => f.severity === 'HIGH').length
   const totalFlags = (cagFindings || []).reduce((s, f) => s + (f.amount_flagged_lakhs || 0), 0)
 
@@ -183,6 +198,25 @@ export default function Alerts() {
           </div>
         </div>
       )}
+
+      <div className="px-6 pt-6">
+        <div className="panel">
+          <div className="panel-title flex justify-between items-center gap-2 flex-wrap">
+            <span>AUDITED ACCOUNTABILITY FLAGS — CAG APPROPRIATION ACCOUNTS</span>
+            {flagYear && <span className="mono text-[8px] text-dim font-normal">FY {flagYear}</span>}
+          </div>
+          {needLatest && flagYear && flagYear !== financialYear && (
+            <p className="mono text-[9px] text-amber-300 mb-2">
+              FY {financialYear} has no audited accounts yet; showing {flagYear}.
+            </p>
+          )}
+          {loadingFlags && <div className="mono text-[9px] text-dim animate-pulse py-2">Loading flags...</div>}
+          {errFlags && <ErrorBox />}
+          {!loadingFlags && !errFlags && (flags.length > 0
+            ? <FlagList flags={flags} showGrant initial={8} />
+            : <p className="mono text-[9px] text-dim">No CAG Appropriation Accounts loaded yet.</p>)}
+        </div>
+      </div>
 
       <div className="p-6 flex flex-col md:flex-row gap-6 flex-1 overflow-hidden">
 

@@ -2,7 +2,7 @@
  * Pure helpers for the grant breakdown (todo.md 2.2b): flatten the head tree, rank unspent items,
  * label note categories and link to a PDF page.
  */
-import type { FigureSource, GrantBreakdown, HeadNode, HeadRowItem, NoteCategory } from './api'
+import type { AccountabilityFlag, FigureSource, FlagKind, GrantBreakdown, HeadNode, HeadRowItem, NoteCategory } from './api'
 
 export function flattenRows(nodes: HeadNode[]): HeadRowItem[] {
   return nodes.flatMap(node => [...node.rows, ...flattenRows(node.children)])
@@ -61,4 +61,21 @@ export function headCodePath(row: HeadRowItem): string {
 export function nodeTotal(node: HeadNode, field: 'final_grant_lakhs' | 'expenditure_lakhs'): number | null {
   const values = flattenRows([node]).map(r => r[field]).filter((v): v is number => v !== null)
   return values.length ? Math.round(values.reduce((a, b) => a + b, 0) * 100) / 100 : null
+}
+
+export const FLAG_KINDS: { kind: FlagKind; label: string; hint: string }[] = [
+  { kind: 'excess_over_grant', label: 'Spent over the grant', hint: 'Needs regularisation by the legislature' },
+  { kind: 'savings_not_surrendered', label: 'Savings not surrendered', hint: 'Unspent money kept instead of surrendered during the year' },
+  { kind: 'supplementary_not_needed', label: 'Supplementary not needed', hint: 'Final saving at least as large as the supplementary grant' },
+  { kind: 'fully_unutilised', label: 'Entire provision unspent', hint: 'Heads where none of the provision was used' },
+  { kind: 'reasons_not_communicated', label: 'Reasons not communicated', hint: 'Share of large variations the department did not explain' },
+]
+
+export function flagLabel(kind: FlagKind): string {
+  return FLAG_KINDS.find(k => k.kind === kind)?.label ?? kind
+}
+
+/** Count of flags per kind, in FLAG_KINDS order, including kinds with none. */
+export function countFlags(flags: AccountabilityFlag[]): { kind: FlagKind; label: string; count: number }[] {
+  return FLAG_KINDS.map(({ kind, label }) => ({ kind, label, count: flags.filter(f => f.kind === kind).length }))
 }

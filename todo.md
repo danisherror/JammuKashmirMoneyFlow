@@ -218,7 +218,7 @@ Layouts differ between years (see the parser docstring), so check the 2021-22 an
   - On the Department page, and on new pages `/grants` (every grant of the latest loaded year, mapped or not) and `/grants/:grantNo` ("CAG Grants" in the nav). When the selected year has no audited accounts, `BreakdownSection` shows the latest audited year and says so.
   - "Unspent" is the printed saving, or the whole provision for "entire provision remained un-utilised" rows. Helpers in `frontend/src/lib/breakdown.ts`, tested in `breakdown.test.ts`.
   - Checked in the browser on 2026-11-23 against a SQLite copy loaded from the three full PDFs (GAD 2022-23 and unmapped grant 3): no console errors.
-- [ ] **Accountability flags** (computed at query time from the stored rows, not invented):
+- [x] **Accountability flags** (computed at query time from the stored rows, not invented):
   - heads where the entire provision went unspent (`fully_unutilised`)
   - savings that were not surrendered
   - supplementary grants that weren't needed (final saving ≥ the supplementary amount)
@@ -226,6 +226,11 @@ Layouts differ between years (see the parser docstring), so check the 2021-22 an
   - excess spending over the grant (needs regularisation by the legislature)
 
   Show them on the department page and add them to the Alerts page, each linked to its PDF page.
+
+  Done 2026-11-23:
+  - Rules in `backend/processors/accountability.py` (pure, tested in `tests/test_accountability.py`): `excess_over_grant` (block spent over its final grant), `savings_not_surrendered` (saving − surrendered > 0), `supplementary_not_needed` (final saving ≥ supplementary), `fully_unutilised` ("entire (supplementary) provision remained un-utilised" heads) and `reasons_not_communicated` (per grant, share of saving/excess heads whose note says so). Each flag restates printed figures in a sentence; nothing is estimated.
+  - `flags` on every breakdown response, and `GET /api/v1/alerts/accountability?financial_year=&kind=&limit=` for all grants. Each flag carries a `FigureSource` with its PDF page. Shown on the department/grant breakdown and in a new section at the top of the Alerts page (`frontend/src/components/FlagList.tsx`), which falls back to the latest audited year.
+  - Cross-check on the full 2023-24 PDF: the excess flags land on grants 8 (revenue and capital) and 36 (revenue), exactly the list the PDF prints as needing regularisation (summary, PDF page 13). 274 flags that year: 159 fully unutilised heads, 74 unsurrendered savings, 36 grants with unexplained variations, 3 excesses, 2 unneeded supplementaries.
 - [ ] **Multi-year trends:** a 2021-22 → 2023-24 (and later years from 2.2) chart for each department and for each major head, using only official figures. Label clearly that these are audited annual accounts and the latest year is 2023-24, not current spending.
 - [ ] **Later, other documents** (not yet checked; record a source URL before relying on any of them):
   - Finance Accounts Vol I/II for the same years, possibly for spending by object head (salaries, works, grants-in-aid) and capital works; content not yet checked.

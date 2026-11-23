@@ -221,6 +221,28 @@ export interface DocumentIssueItem {
   text: string
 }
 
+export type FlagKind =
+  | 'excess_over_grant' | 'savings_not_surrendered' | 'supplementary_not_needed'
+  | 'fully_unutilised' | 'reasons_not_communicated'
+
+/** A fact restated from the printed CAG figures (backend processors/accountability.py). */
+export interface AccountabilityFlag {
+  kind: FlagKind
+  financial_year: string
+  grant_no: number
+  grant_name: string
+  department_id: number | null
+  section: string | null
+  block_kind: string | null
+  head_code: string | null
+  head_name: string | null
+  /** ₹ lakhs */
+  amount_lakhs: number | null
+  share_pct: number | null
+  detail: string
+  source: FigureSource
+}
+
 /**
  * Where a department's (or one grant's) money went. The head rows are only the heads the CAG
  * commented on, so they don't add up to the grant total; the section blocks do.
@@ -233,6 +255,7 @@ export interface GrantBreakdown {
   tree: HeadNode[]
   notes: NoteItem[]
   issues: DocumentIssueItem[]
+  flags: AccountabilityFlag[]
   /** Why the breakdown is empty, when it is. */
   note: string | null
 }
@@ -468,6 +491,10 @@ export const fetchDepartmentBreakdown = (id: number, financialYear?: string) =>
 
 export const fetchGrantBreakdown = (grantNo: number, financialYear?: string) =>
   get<GrantBreakdown>(`/budget/grants/${grantNo}/breakdown`, { financial_year: financialYear })
+
+/** Omit the year for the latest year with CAG grant pages loaded. */
+export const fetchAccountabilityFlags = (financialYear?: string, kind?: FlagKind) =>
+  get<AccountabilityFlag[]>('/alerts/accountability', { financial_year: financialYear, kind })
 
 export const fetchGrants = (financialYear?: string) =>
   get<GrantInfo[]>('/budget/grants', { financial_year: financialYear })

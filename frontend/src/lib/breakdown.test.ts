@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { FigureSource, GrantBreakdown, HeadNode, HeadRowItem } from './api'
-import { biggestUnspent, categoryLabel, flattenRows, nodeTotal, pdfPageUrl, unspentLakhs } from './breakdown'
+import { biggestUnspent, categoryLabel, countFlags, flagLabel, flattenRows, nodeTotal, pdfPageUrl, unspentLakhs } from './breakdown'
 
 const source: FigureSource = {
   source_type: 'official', label: 'Official · Appropriation Accounts 2023-24, p.20', measure: null,
@@ -31,7 +31,7 @@ const tree: HeadNode[] = [{
 }]
 
 const breakdown: GrantBreakdown = {
-  financial_year: '2023-24', department_id: 1, grants: [], section_blocks: [], tree, notes: [], issues: [], note: null,
+  financial_year: '2023-24', department_id: 1, grants: [], section_blocks: [], tree, notes: [], issues: [], flags: [], note: null,
 }
 
 describe('breakdown helpers', () => {
@@ -65,5 +65,19 @@ describe('breakdown helpers', () => {
 
   it('labels categories', () => {
     expect(categoryLabel('unutilised')).toBe('Entire provision unspent')
+  })
+})
+
+describe('flag helpers', () => {
+  it('counts flags per kind in a fixed order, zeros included', () => {
+    const flag = { kind: 'fully_unutilised', financial_year: '2023-24', grant_no: 1, grant_name: 'GAD',
+      department_id: null, section: null, block_kind: null, head_code: null, head_name: null,
+      amount_lakhs: 650, share_pct: null, detail: '', source } as const
+    const counts = countFlags([flag, { ...flag }, { ...flag, kind: 'excess_over_grant' }])
+    expect(counts.map(c => [c.kind, c.count])).toEqual([
+      ['excess_over_grant', 1], ['savings_not_surrendered', 0], ['supplementary_not_needed', 0],
+      ['fully_unutilised', 2], ['reasons_not_communicated', 0],
+    ])
+    expect(flagLabel('savings_not_surrendered')).toBe('Savings not surrendered')
   })
 })
