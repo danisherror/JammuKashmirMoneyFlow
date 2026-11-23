@@ -191,6 +191,8 @@ async def list_grants(db: AsyncSession, financial_year: str) -> list[GrantInfo]:
             func.max(AppropriationAccountLine.grant_name_raw).label("name"),
             func.sum(AppropriationAccountLine.final_grant_thousand).label("final_grant"),
             func.sum(AppropriationAccountLine.gross_expenditure_thousand).label("expenditure"),
+            func.min(AppropriationAccountLine.page).label("page"),
+            func.max(AppropriationAccountLine.snapshot_id).label("snapshot_id"),
         )
         .where(AppropriationAccountLine.financial_year == financial_year)
         .group_by(AppropriationAccountLine.grant_no)
@@ -200,6 +202,12 @@ async def list_grants(db: AsyncSession, financial_year: str) -> list[GrantInfo]:
         select(GrantDepartmentMap.grant_no, GrantDepartmentMap.department_id)
         .where(GrantDepartmentMap.financial_year == financial_year)
     )).all())
+    snapshot_ids = {r.snapshot_id for r in rows}
+    snapshots = {
+        snap.id: snap for snap in (await db.execute(
+            select(SourceSnapshot).where(SourceSnapshot.id.in_(snapshot_ids))
+        )).scalars()
+    } if snapshot_ids else {}
     return [
         GrantInfo(
             grant_no=r.grant_no,
@@ -207,6 +215,8 @@ async def list_grants(db: AsyncSession, financial_year: str) -> list[GrantInfo]:
             department_id=mapped.get(r.grant_no),
             final_grant_lakhs=_lakhs(r.final_grant),
             gross_expenditure_lakhs=_lakhs(r.expenditure),
+            source=_page_source(snapshots[r.snapshot_id], financial_year, r.page, "final_grant")
+            if r.snapshot_id in snapshots else None,
         )
         for r in rows
     ]

@@ -18,6 +18,9 @@ from collectors.base_collector import BaseCollector, SourceUnavailableError
 
 class CGACollector(BaseCollector):
     collector_name = "cga_collector"
+    label = "Monthly expenditure (CGA)"
+    source_name = "no published monthly source found yet"
+    source_url = None
 
     def __init__(self, db: Session, **_ignored):
         super().__init__(db)

@@ -7,6 +7,7 @@ import PageHeader from '../components/PageHeader'
 import ErrorBox from '../components/ErrorBox'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend } from 'recharts'
 import { ChevronRight } from 'lucide-react'
+import CollectorSource from '../components/CollectorSource'
 
 export default function DBT() {
   const { financialYear } = useAppStore()
@@ -41,7 +42,10 @@ export default function DBT() {
         
         {/* Left Col: Scheme List */}
         <div className="w-full md:w-1/3 flex flex-col gap-4">
-          <div className="mono text-[10px] text-dim tracking-widest px-1">SCHEMES TRACKED</div>
+          <div className="px-1">
+            <div className="mono text-[10px] text-dim tracking-widest">SCHEMES TRACKED</div>
+            <CollectorSource collectors={['dbt_collector']} />
+          </div>
           
           <div className="flex-1 overflow-auto space-y-2 pr-2 custom-scrollbar">
             {loadingSchemes && <div className="text-dim mono text-[10px] animate-pulse">Loading schemes...</div>}
@@ -94,9 +98,7 @@ export default function DBT() {
                 <span className="text-blue mr-2">LAST MILE GAP:</span>
                 <span className="text-white">{selectedScheme?.scheme_name || 'Select a Scheme'}</span>
               </div>
-              <span className="mono text-[9px] text-dim font-normal px-2 py-1 border border-[#1a2a3a] bg-white/5">
-                Source: dbtbharat.gov.in
-              </span>
+              <CollectorSource collectors={['dbt_collector']} className="px-2 py-1 border border-[#1a2a3a] bg-white/5" />
             </div>
 
             {selectedScheme && (

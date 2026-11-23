@@ -4,17 +4,6 @@ import { fetchSyncStatus } from '../lib/api'
 import { Link } from 'react-router-dom'
 import clsx from 'clsx'
 
-const COLLECTOR_LABELS: Record<string, string> = {
-  'mgnrega_collector': 'MGNREGA',
-  'jjm_collector': 'JJM',
-  'pmay_collector': 'PMAY-G',
-  'dbt_collector': 'DBT',
-  'pfms_collector': 'PFMS',
-  'tenders_collector': 'TENDERS',
-  'cga_collector': 'CGA (EXP)',
-  'cag_collector': 'CAG AUDITS',
-}
-
 /**
  * Shows a strip of data freshness badges — one per active collector.
  * If data is stale or never fetched, it shows clearly so users
@@ -65,7 +54,7 @@ export default function DataFreshness() {
           <div key={s.collector_name} className="flex items-center gap-2 flex-shrink-0 bg-slate-800/40 px-3 py-1.5 rounded-full border border-slate-700/50">
             <div className={clsx("w-2 h-2 rounded-full", dotColor, healthy && "shadow-[0_0_8px_rgba(52,211,153,0.8)]")} />
             <span className={clsx("text-[10px] font-bold tracking-wide", textColor)}>
-              {COLLECTOR_LABELS[s.collector_name] ?? s.collector_name.replace('_collector', '').toUpperCase()}
+              {s.label.toUpperCase()}
             </span>
             <span className="text-[10px] font-medium text-slate-500 ml-1">{timeLabel}</span>
           </div>

@@ -20,6 +20,8 @@ import PageHeader from '../components/PageHeader'
 import LoadingGrid from '../components/LoadingGrid'
 import ErrorBox from '../components/ErrorBox'
 import BudgetSankey from '../components/BudgetSankey'
+import CollectorSource from '../components/CollectorSource'
+import { SCHEME_PROGRESS_COLLECTORS } from '../lib/collectors'
 
 const COLORS = ['#00ff88', '#00aaff', '#ffd700', '#ff6432', '#ff3366', '#aa44ff']
 
@@ -127,6 +129,7 @@ export default function Overview() {
         {(criticalCount > 0 || warningCount > 0) && (
           <div className="panel border-red-800/30 p-3 flex items-center gap-6">
             <div className="mono text-[9px] text-dim tracking-widest">FUND UTILIZATION ALERTS</div>
+            <CollectorSource collectors={SCHEME_PROGRESS_COLLECTORS} className="order-last ml-auto" />
             {criticalCount > 0 && (
               <div className="mono text-[10px] text-red">
                 🔴 {criticalCount} scheme-districts with &lt;20% utilization

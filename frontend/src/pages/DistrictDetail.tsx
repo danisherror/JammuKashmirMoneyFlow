@@ -7,6 +7,8 @@ import UtilBar from '../components/UtilBar'
 import PageHeader from '../components/PageHeader'
 import ErrorBox from '../components/ErrorBox'
 import { ChevronLeft } from 'lucide-react'
+import CollectorSource from '../components/CollectorSource'
+import { SCHEME_PROGRESS_COLLECTORS } from '../lib/collectors'
 
 export default function DistrictDetail() {
   const { id } = useParams<{ id: string }>()
@@ -34,6 +36,7 @@ export default function DistrictDetail() {
       />
 
       <div className="p-6 space-y-6">
+        <CollectorSource collectors={SCHEME_PROGRESS_COLLECTORS} className="block" />
         {isLoading && <div className="panel h-40 flex items-center justify-center mono text-[10px] text-dim animate-pulse">Loading...</div>}
         {isError && <ErrorBox />}
 

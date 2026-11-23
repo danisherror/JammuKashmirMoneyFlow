@@ -126,7 +126,10 @@ export default function SchemeDetail() {
 
                 {/* District Map */}
                 <div className="panel p-0 flex flex-col">
-                  <div className="panel-title p-4 pb-0 mb-0">DISTRICT MAP (FUNDS ALLOCATED & UTILIZED)</div>
+                  <div className="flex items-center justify-between gap-2 p-4 pb-0">
+                    <div className="panel-title mb-0">DISTRICT MAP (FUNDS ALLOCATED & UTILIZED)</div>
+                    <SourceBadge source={data.sources.district_progress} />
+                  </div>
                   <div className="flex-1 min-h-[300px]">
                     <MapWidget data={data.district_progress} height={350} />
                   </div>
@@ -134,7 +137,10 @@ export default function SchemeDetail() {
 
                 {/* District chart */}
                 <div className="panel">
-                  <div className="panel-title">DISTRICT-WISE UTILIZATION %</div>
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="panel-title">DISTRICT-WISE UTILIZATION %</div>
+                    <SourceBadge source={data.sources.district_progress} />
+                  </div>
                   <ResponsiveContainer width="100%" height={300}>
                     <BarChart data={districtChartData} barSize={18} margin={{ top: 20, right: 20, left: -20, bottom: 20 }}>
                       <XAxis dataKey="name" tick={{ fill: '#5a7a9a', fontSize: 9, fontFamily: 'Space Mono' }} />

@@ -67,6 +67,9 @@ DISTRICT_MAP = {
 
 class JJMCollector(BaseCollector):
     collector_name = "jjm_collector"
+    label = "Jal Jeevan Mission"
+    source_name = "ejalshakti.gov.in"
+    source_url = f"{BASE}/JJMIndia.aspx"
     request_delay  = 1.5
 
     def __init__(self, db: Session, financial_year: str = "2024-25"):

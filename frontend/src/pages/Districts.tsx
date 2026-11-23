@@ -6,6 +6,8 @@ import { fmtLakhs, fmtPct, gradeColor, divisionLabel } from '../lib/utils'
 import PageHeader from '../components/PageHeader'
 import LoadingGrid from '../components/LoadingGrid'
 import ErrorBox from '../components/ErrorBox'
+import CollectorSource from '../components/CollectorSource'
+import { SCHEME_PROGRESS_COLLECTORS } from '../lib/collectors'
 
 export default function Districts() {
   const { financialYear } = useAppStore()
@@ -103,6 +105,7 @@ export default function Districts() {
       />
 
       <div className="p-6 space-y-8">
+        <CollectorSource collectors={SCHEME_PROGRESS_COLLECTORS} className="block" />
         {isLoading ? <LoadingGrid count={20} /> :
          isError   ? <ErrorBox /> : (
           <>

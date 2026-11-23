@@ -5,6 +5,7 @@ import { fmtLakhs, fmtPct } from '../lib/utils'
 import { pct } from '../lib/grants'
 import PageHeader from '../components/PageHeader'
 import ErrorBox from '../components/ErrorBox'
+import SourceBadge from '../components/SourceBadge'
 
 /**
  * Every grant in the latest CAG Appropriation Accounts, mapped to a tracker department or not
@@ -33,7 +34,8 @@ export default function Grants() {
                   <th className="py-1 pr-2 font-normal text-right">Final grant</th>
                   <th className="py-1 pr-2 font-normal text-right">Gross expenditure</th>
                   <th className="py-1 pr-2 font-normal text-right">Spent</th>
-                  <th className="py-1 font-normal">Tracker department</th>
+                  <th className="py-1 pr-2 font-normal">Tracker department</th>
+                  <th className="py-1 font-normal">Source</th>
                 </tr>
               </thead>
               <tbody>
@@ -51,6 +53,7 @@ export default function Grants() {
                         ? <Link to={`/departments/${g.department_id}`} className="text-sky-300 hover:underline">view</Link>
                         : <span className="text-dim">not mapped</span>}
                     </td>
+                    <td className="py-1.5"><SourceBadge source={g.source} value={g.final_grant_lakhs} /></td>
                   </tr>
                 ))}
               </tbody>

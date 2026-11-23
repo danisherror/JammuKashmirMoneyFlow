@@ -3010,6 +3010,17 @@
               }
             ],
             "title": "Gross Expenditure Lakhs"
+          },
+          "source": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FigureSource"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Summary-table page of the grant in the snapshot PDF"
           }
         },
         "type": "object",
@@ -4341,9 +4352,32 @@
             "type": "string",
             "title": "Collector Name"
           },
+          "label": {
+            "type": "string",
+            "title": "Label",
+            "description": "Human name, e.g. 'Jal Jeevan Mission'"
+          },
+          "source_name": {
+            "type": "string",
+            "title": "Source Name",
+            "description": "Portal the collector reads, or why there is none"
+          },
+          "source_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Url",
+            "description": "Page the collector reads; null when not yet known"
+          },
           "status": {
             "type": "string",
-            "title": "Status"
+            "title": "Status",
+            "description": "success | partial | no_source | failed | running | skipped, or never_run when the collector has no logged run"
           },
           "last_run": {
             "anyOf": [
@@ -4405,6 +4439,9 @@
         "type": "object",
         "required": [
           "collector_name",
+          "label",
+          "source_name",
+          "source_url",
           "status",
           "last_run",
           "last_success",

@@ -83,6 +83,9 @@ DISTRICT_NAME_MAP = {
 
 class MGNREGACollector(BaseCollector):
     collector_name = "mgnrega_collector"
+    label = "MGNREGA"
+    source_name = "nreganarayan.nic.in"
+    source_url = f"{BASE}/netnrega/home.aspx"
     request_delay  = 2.0
 
     def __init__(self, db: Session, financial_year: str = "2024-25"):

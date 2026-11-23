@@ -72,7 +72,11 @@ In these collectors, the "live" path always throws, so the random generator alwa
 **Done when:** a collector that writes zero real rows logs `partial` or `no_source` (never `success`), and `next_run` in `/alerts/sync-status` equals APScheduler's `job.next_run_time` for that job.
 
 ### 1.3 Make the UI honest about provenance and freshness
-- [ ] Every KPI, chart and table shows "Source: <portal> · fetched <date>" with a link to the source document.
+- [x] Every KPI, chart and table shows "Source: <portal> · fetched <date>" with a link to the source document. Done 2026-11-23:
+  - Budget, department and scheme figures already had `SourceBadge` (2.2a step 3). The scheme page's district map and chart now have one too, and each row of the Grants page links to its summary-table page in the stored PDF (`GrantInfo.source`).
+  - Collector-backed panels (Districts, District detail, Tenders, DBT, the low-utilisation flags on Alerts and Overview, the CAG feed) show `CollectorSource`: "Source: jktenders.gov.in · fetched 22 Nov 2026", linked to the page the collector reads, or "never fetched successfully" / "never run". It reads the new `label`, `source_name` and `source_url` attributes on each collector class through `/alerts/sync-status`, which now lists every scheduled collector, including ones that have never run (`status: "never_run"`). Helpers in `frontend/src/lib/collectors.ts`, tested with vitest; route test in `tests/test_scheduler_next_run.py`.
+  - The Sync Status page and freshness strip read the same fields instead of a hardcoded list that had wrong schedules (PFMS "Daily", CAG "Monthly (Phase 3)"). The CAG feed no longer claims its findings are "AI-summarized ... using Gemini".
+  - **Open:** the fetch date for collector panels is the collector's last successful run, not each row's own fetch. Per-row snapshots and download links come with 1.4.
 - [ ] Empty states say "No data collected yet from <source> — last attempt failed: <reason>" instead of showing `0` or `0.0%`. Today a missing utilisation shows as `0.0%` with a `critical` gap flag (`/budget/gap-analysis`), which is misleading.
 - [ ] Separate "₹0 spent" (a real zero) from "unknown" (`null`) all the way through the API schema and the UI.
 

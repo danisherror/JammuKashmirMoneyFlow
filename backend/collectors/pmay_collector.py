@@ -21,6 +21,9 @@ PMAY_URL = "https://pmayg.nic.in/netiay/home.aspx"
 
 class PMAYCollector(BaseCollector):
     collector_name = "pmay_collector"
+    label = "PM Awas Yojana (Gramin)"
+    source_name = "pmayg.nic.in"
+    source_url = PMAY_URL
 
     def __init__(self, db: Session, financial_year: Optional[str] = None):
         super().__init__(db)

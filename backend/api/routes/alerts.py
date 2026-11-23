@@ -16,7 +16,7 @@ from api.schemas import (
     AccountabilityFlag, CAGFindingItem, LowUtilizationAlert, SyncStatusItem, TriggerResponse,
 )
 from api.official import grant_flags, latest_detail_year
-from scheduler.jobs import next_run_times
+from scheduler.jobs import ALL_COLLECTORS, next_run_times
 
 router = APIRouter(prefix="/alerts", tags=["Alerts"])
 
@@ -72,20 +72,26 @@ async def get_sync_status(request: Request, db: AsyncSession = Depends(get_db)):
     success_rows = (await db.execute(success_subq)).all()
     success_map = {row.collector_name: row.last_success for row in success_rows}
 
+    latest = {log.collector_name: log for log in rows}
     results = []
-    for log in rows:
-        last_success = success_map.get(log.collector_name)
-        is_healthy = log.status == CollectorStatus.SUCCESS
-
+    # Every scheduled collector, in scheduler order, including ones that have never run,
+    # so the dashboard can say "never fetched" instead of leaving the source out.
+    for collector in ALL_COLLECTORS:
+        name = collector.collector_name
+        log = latest.get(name)
+        is_healthy = log is not None and log.status == CollectorStatus.SUCCESS
         results.append(SyncStatusItem(
-            collector_name=log.collector_name,
-            status=log.status,
-            last_run=log.started_at,
-            last_success=last_success,
-            records_last_run=(log.records_inserted or 0) + (log.records_updated or 0),
-            next_run=next_runs.get(log.collector_name),
+            collector_name=name,
+            label=collector.label,
+            source_name=collector.source_name,
+            source_url=collector.source_url,
+            status=log.status.value if log else "never_run",
+            last_run=log.started_at if log else None,
+            last_success=success_map.get(name),
+            records_last_run=((log.records_inserted or 0) + (log.records_updated or 0)) if log else 0,
+            next_run=next_runs.get(name),
             is_healthy=is_healthy,
-            error_message=log.error_message if not is_healthy else None,
+            error_message=log.error_message if log and not is_healthy else None,
         ))
 
     return results

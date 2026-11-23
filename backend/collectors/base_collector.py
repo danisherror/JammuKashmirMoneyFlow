@@ -41,6 +41,10 @@ class BaseCollector(ABC):
 
     # Override in subclass
     collector_name: str = "base"
+    # Shown on the dashboard next to the figures this collector writes, and in empty states.
+    label: str = "base"
+    source_name: str = "unknown"          # portal host, or why there is none
+    source_url: Optional[str] = None      # the page the collector reads; None when not yet known
     # How many seconds to wait between requests (be polite to govt servers)
     request_delay: float = 1.0
     # Timeout for each HTTP request

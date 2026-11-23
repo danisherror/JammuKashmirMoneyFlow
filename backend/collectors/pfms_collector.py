@@ -20,6 +20,9 @@ PFMS_URL = "https://pfms.nic.in/NewDefaultHome.aspx"
 
 class PFMSCollector(BaseCollector):
     collector_name = "pfms_collector"
+    label = "PFMS central releases"
+    source_name = "pfms.nic.in"
+    source_url = PFMS_URL
 
     def __init__(self, db: Session, **_ignored):
         super().__init__(db)

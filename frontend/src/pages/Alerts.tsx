@@ -7,6 +7,8 @@ import { fmtLakhs, fmtPct } from '../lib/utils'
 import PageHeader from '../components/PageHeader'
 import ErrorBox from '../components/ErrorBox'
 import { ExternalLink, AlertTriangle, TrendingDown, FileText } from 'lucide-react'
+import CollectorSource from '../components/CollectorSource'
+import { SCHEME_PROGRESS_COLLECTORS } from '../lib/collectors'
 
 // ── Low Utilization Alert Row ─────────────────────────────────────────────────
 
@@ -231,6 +233,7 @@ export default function Alerts() {
             <span>⚠️ LOW UTILIZATION FLAGS</span>
             <span className="mono text-[8px] text-dim font-normal">FY {financialYear}</span>
           </div>
+          <CollectorSource collectors={SCHEME_PROGRESS_COLLECTORS} className="block px-4 pt-2" />
           <div className="flex-1 overflow-auto px-4 py-2 custom-scrollbar">
             {loadingUtil && <div className="mono text-[9px] text-dim animate-pulse py-4">Loading alerts...</div>}
             {errUtil && <ErrorBox />}
@@ -245,8 +248,9 @@ export default function Alerts() {
         <div className="w-full md:w-3/5 flex flex-col overflow-hidden">
           <div className="mono text-[10px] text-dim tracking-widest mb-3 flex items-center gap-2">
             <span className="w-2 h-2 rounded-full bg-red animate-pulse inline-block" />
-            CAG AUDIT FEED — AI-SUMMARIZED IRREGULARITIES
+            CAG AUDIT FEED
             <span className="mono text-[8px] text-dim ml-2 font-normal border border-[#1a2a3a] px-1.5 py-0.5 bg-white/5">ALL YEARS</span>
+            <CollectorSource collectors={['cag_collector']} className="ml-auto" />
           </div>
           <div className="flex-1 overflow-auto custom-scrollbar">
             {loadingCAG && <div className="mono text-[9px] text-dim animate-pulse">Loading audit findings...</div>}
@@ -261,14 +265,6 @@ export default function Alerts() {
             )}
             {(cagFindings || []).map(f => <CAGCard key={f.id} f={f} />)}
 
-            {(cagFindings || []).length > 0 && (
-              <div className="mono text-[8px] text-dim text-center mt-4 pb-4">
-                💡 Findings are AI-summarized from actual CAG audit paragraphs using Gemini.{' '}
-                <a href="https://cag.gov.in/en/audit-report?tags=Jammu+%26+Kashmir" target="_blank" rel="noopener noreferrer" className="text-blue hover:opacity-80">
-                  View source reports ↗
-                </a>
-              </div>
-            )}
           </div>
         </div>
 

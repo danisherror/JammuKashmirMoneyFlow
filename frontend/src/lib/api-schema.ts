@@ -1040,6 +1040,8 @@ export interface components {
             final_grant_lakhs?: number | null;
             /** Gross Expenditure Lakhs */
             gross_expenditure_lakhs?: number | null;
+            /** @description Summary-table page of the grant in the snapshot PDF */
+            source?: components["schemas"]["FigureSource"] | null;
         };
         /** HTTPValidationError */
         HTTPValidationError: {
@@ -1502,7 +1504,25 @@ export interface components {
         SyncStatusItem: {
             /** Collector Name */
             collector_name: string;
-            /** Status */
+            /**
+             * Label
+             * @description Human name, e.g. 'Jal Jeevan Mission'
+             */
+            label: string;
+            /**
+             * Source Name
+             * @description Portal the collector reads, or why there is none
+             */
+            source_name: string;
+            /**
+             * Source Url
+             * @description Page the collector reads; null when not yet known
+             */
+            source_url: string | null;
+            /**
+             * Status
+             * @description success | partial | no_source | failed | running | skipped, or never_run when the collector has no logged run
+             */
             status: string;
             /** Last Run */
             last_run: string | null;

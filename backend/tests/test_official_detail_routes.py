@@ -210,6 +210,11 @@ def test_grant_list_includes_unmapped_grants(setup):
     assert grants[1]["department_id"] == ids["GAD"]
     assert grants[24]["department_id"] is None
     assert grants[1]["final_grant_lakhs"] == 72427.70
+    # Each grant links to its summary-table page in the stored PDF.
+    src = grants[1]["source"]
+    assert src["source_type"] == "official" and src["snapshot_id"] is not None
+    assert src["page"] >= 1 and src["fetched_at"] is not None
+    assert src["label"] == f"Official · Appropriation Accounts {YEAR}, p.{src['page']}"
 
 
 def test_breakdown_defaults_to_the_latest_loaded_year(setup):

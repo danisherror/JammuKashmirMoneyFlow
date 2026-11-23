@@ -6,6 +6,7 @@ import PageHeader from '../components/PageHeader'
 import ErrorBox from '../components/ErrorBox'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts'
 import { Search } from 'lucide-react'
+import CollectorSource from '../components/CollectorSource'
 
 export default function Tenders() {
   const [searchTerm, setSearchTerm] = useState('')
@@ -74,7 +75,10 @@ export default function Tenders() {
         <div className="panel flex flex-col h-[350px]">
           <div className="panel-title flex justify-between">
             <span>🏆 TOP CONTRACTORS BY AWARDED VALUE</span>
-            <span className="mono text-[8px] text-dim font-normal">Top 15 — All Departments</span>
+            <span className="flex flex-col items-end gap-0.5">
+              <span className="mono text-[8px] text-dim font-normal">Top 15 — All Departments</span>
+              <CollectorSource collectors={['tenders_collector']} />
+            </span>
           </div>
           <div className="flex-1 p-4 relative">
             {loadingLeaderboard ? (
@@ -122,9 +126,7 @@ export default function Tenders() {
         <div className="panel flex-1 flex flex-col min-h-[400px]">
           <div className="panel-title flex justify-between items-center sticky top-0 bg-[#080e18] z-10 border-b border-[#1a2a3a]">
             <span>LATEST TENDERS</span>
-            <span className="mono text-[9px] text-dim font-normal px-2 py-1 border border-[#1a2a3a] bg-white/5">
-              Source: jktenders.gov.in
-            </span>
+            <CollectorSource collectors={['tenders_collector']} className="px-2 py-1 border border-[#1a2a3a] bg-white/5" />
           </div>
           
           <div className="flex-1 overflow-auto">

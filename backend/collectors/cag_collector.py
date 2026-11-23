@@ -15,6 +15,9 @@ from collectors.base_collector import BaseCollector, SourceUnavailableError
 
 class CAGCollector(BaseCollector):
     collector_name = "cag_collector"
+    label = "CAG audit reports"
+    source_name = "cag.gov.in audit reports"
+    source_url = None
 
     def __init__(self, db: Session, **_ignored):
         super().__init__(db)

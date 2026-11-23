@@ -20,6 +20,9 @@ TENDERS_URL = "https://jktenders.gov.in/nicgep/app"
 
 class TendersCollector(BaseCollector):
     collector_name = "tenders_collector"
+    label = "Tenders"
+    source_name = "jktenders.gov.in"
+    source_url = TENDERS_URL
 
     def __init__(self, db: Session, **_ignored):
         super().__init__(db)

@@ -21,6 +21,9 @@ DBT_URL = "https://dbtbharat.gov.in/data/statewise"
 
 class DBTCollector(BaseCollector):
     collector_name = "dbt_collector"
+    label = "DBT transfers"
+    source_name = "dbtbharat.gov.in"
+    source_url = DBT_URL
 
     def __init__(self, db: Session, financial_year: Optional[str] = None):
         super().__init__(db)

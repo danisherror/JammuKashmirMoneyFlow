@@ -156,6 +156,7 @@ class GrantInfo(BaseModel):
     department_id: Optional[int] = Field(description="Tracker department, via grant_department_map; null if unmapped")
     final_grant_lakhs: Optional[float] = None
     gross_expenditure_lakhs: Optional[float] = None
+    source: Optional[FigureSource] = Field(None, description="Summary-table page of the grant in the snapshot PDF")
 
 
 class SectionBlockItem(BaseModel):
@@ -398,7 +399,13 @@ class DistrictDetail(DistrictHeatmapItem):
 
 class SyncStatusItem(BaseModel):
     collector_name: str
-    status: str
+    label: str = Field(description="Human name, e.g. 'Jal Jeevan Mission'")
+    source_name: str = Field(description="Portal the collector reads, or why there is none")
+    source_url: Optional[str] = Field(description="Page the collector reads; null when not yet known")
+    status: str = Field(
+        description="success | partial | no_source | failed | running | skipped, or never_run when the "
+                    "collector has no logged run"
+    )
     last_run: Optional[datetime]
     last_success: Optional[datetime]
     records_last_run: int

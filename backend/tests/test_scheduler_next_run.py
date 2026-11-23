@@ -41,13 +41,12 @@ def test_no_scheduler_means_no_next_run():
     assert jobs.next_run_times(None) == {}
 
 
-def test_sync_status_route_uses_the_scheduler(tmp_path, scheduler):
+def _sync_status(tmp_path, scheduler, logs):
     path = tmp_path / "db.sqlite"
     sync_engine = create_engine(f"sqlite:///{path}")
     Base.metadata.create_all(sync_engine)
     with Session(sync_engine) as db:
-        db.add(DataSyncLog(collector_name="jjm_collector", status=CollectorStatus.SUCCESS,
-                           started_at=datetime(2026, 11, 22, tzinfo=timezone.utc), records_inserted=3))
+        db.add_all(logs)
         db.commit()
 
     sessions = async_sessionmaker(create_async_engine(f"sqlite+aiosqlite:///{path}"), expire_on_commit=False)
@@ -61,8 +60,39 @@ def test_sync_status_route_uses_the_scheduler(tmp_path, scheduler):
     app.dependency_overrides[get_db] = override_db
     app.state.scheduler = scheduler
     with TestClient(app) as client:
-        [item] = client.get("/api/v1/alerts/sync-status").json()
-
-    expected = scheduler.get_job(jobs.WEEKLY_JOB_ID).next_run_time
-    assert datetime.fromisoformat(item["next_run"]) == expected
+        items = client.get("/api/v1/alerts/sync-status").json()
     sync_engine.dispose()
+    return {i["collector_name"]: i for i in items}
+
+
+def test_sync_status_route_uses_the_scheduler(tmp_path, scheduler):
+    items = _sync_status(tmp_path, scheduler, [
+        DataSyncLog(collector_name="jjm_collector", status=CollectorStatus.SUCCESS,
+                    started_at=datetime(2026, 11, 22, tzinfo=timezone.utc), records_inserted=3),
+    ])
+    expected = scheduler.get_job(jobs.WEEKLY_JOB_ID).next_run_time
+    assert datetime.fromisoformat(items["jjm_collector"]["next_run"]) == expected
+
+
+def test_sync_status_lists_every_collector_with_its_source(tmp_path, scheduler):
+    items = _sync_status(tmp_path, scheduler, [
+        DataSyncLog(collector_name="tenders_collector", status=CollectorStatus.NO_SOURCE,
+                    started_at=datetime(2026, 11, 22, tzinfo=timezone.utc),
+                    error_message="CAPTCHA on the search page"),
+    ])
+    assert list(items) == [c.collector_name for c in jobs.ALL_COLLECTORS]
+
+    tenders = items["tenders_collector"]
+    assert tenders["status"] == "no_source"
+    assert tenders["error_message"] == "CAPTCHA on the search page"
+    assert tenders["source_name"] == "jktenders.gov.in"
+    assert tenders["source_url"].startswith("https://jktenders.gov.in/")
+    assert tenders["label"] == "Tenders"
+
+    never = items["dbt_collector"]
+    assert never["status"] == "never_run"
+    assert never["last_run"] is None and never["last_success"] is None
+    assert never["is_healthy"] is False and never["records_last_run"] == 0
+
+    # A collector without a known source says so instead of linking somewhere.
+    assert items["cga_collector"]["source_url"] is None
