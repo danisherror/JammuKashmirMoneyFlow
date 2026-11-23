@@ -371,6 +371,7 @@ export interface DistrictDetail extends DistrictHeatmapItem {
 
 export interface SyncStatusItem {
   collector_name: string
+  /** success | partial (no rows written or some skipped) | no_source | failed | running | skipped */
   status: string
   last_run: ISODateTime | null
   last_success: ISODateTime | null

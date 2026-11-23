@@ -1,5 +1,5 @@
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
-from sqlalchemy import create_engine
+from sqlalchemy import Enum as SAEnum, create_engine, text
 from sqlalchemy.orm import sessionmaker
 from contextlib import asynccontextmanager
 from loguru import logger
@@ -62,10 +62,50 @@ async def get_sync_db():
 
 
 # ── Create all tables (called on startup) ─────────────────────────────────────
+def add_missing_enum_values(sync_conn) -> list[str]:
+    """
+    create_all creates Postgres enum types but never adds a value to one that
+    already exists, so a database created before e.g. CollectorStatus.PARTIAL
+    would reject the new status. Add any missing labels. Remove this once
+    Alembic manages the schema (todo.md 3.1).
+
+    Postgres 12+ allows ALTER TYPE ... ADD VALUE inside a transaction as long
+    as the new value isn't used in the same transaction:
+    https://www.postgresql.org/docs/16/sql-altertype.html (Notes)
+    """
+    if sync_conn.dialect.name != "postgresql":
+        return []
+    added, seen = [], set()
+    for table in Base.metadata.sorted_tables:
+        for column in table.columns:
+            enum_type = column.type
+            if not isinstance(enum_type, SAEnum) or not enum_type.name or enum_type.name in seen:
+                continue
+            seen.add(enum_type.name)
+            existing = set(sync_conn.execute(
+                text(
+                    "SELECT e.enumlabel FROM pg_enum e "
+                    "JOIN pg_type t ON t.oid = e.enumtypid WHERE t.typname = :name"
+                ),
+                {"name": enum_type.name},
+            ).scalars())
+            if not existing:
+                continue   # type doesn't exist yet; create_all makes it with every label
+            for label in enum_type.enums:
+                if label not in existing:
+                    quoted = label.replace("'", "''")
+                    sync_conn.execute(text(f'ALTER TYPE "{enum_type.name}" ADD VALUE IF NOT EXISTS \'{quoted}\''))
+                    added.append(f"{enum_type.name}.{label}")
+    return added
+
+
 async def init_db():
     logger.info("Initializing database tables...")
     async with async_engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+        added = await conn.run_sync(add_missing_enum_values)
+    if added:
+        logger.info(f"Added enum values: {', '.join(added)}")
     logger.info("Database tables ready.")
 
 

@@ -259,6 +259,7 @@ class JJMCollector(BaseCollector):
             ).scalar_one_or_none()
             if not district:
                 logger.warning(f"[jjm] District {row['district_code']} not in DB")
+                self.skip(f"district {row['district_code']} not in DB")
                 continue
 
             dist_hh    = row.get("total_hh", 0)

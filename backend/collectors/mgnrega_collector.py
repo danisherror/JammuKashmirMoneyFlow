@@ -290,6 +290,7 @@ class MGNREGACollector(BaseCollector):
             ).scalar_one_or_none()
             if not district:
                 logger.warning(f"[mgnrega] District code {row['district_code']} not in DB")
+                self.skip(f"district {row['district_code']} not in DB")
                 continue
 
             person_days  = row.get("person_days_generated", 0)

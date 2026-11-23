@@ -24,7 +24,9 @@ class SchemeType(str, enum.Enum):
 
 
 class CollectorStatus(str, enum.Enum):
-    SUCCESS = "success"
+    SUCCESS = "success"        # real rows written, nothing skipped
+    PARTIAL = "partial"        # finished, but wrote no rows or skipped some
+    NO_SOURCE = "no_source"    # no public, automation-friendly source to collect from
     FAILED = "failed"
     RUNNING = "running"
     SKIPPED = "skipped"

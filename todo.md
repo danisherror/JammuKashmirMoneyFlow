@@ -62,7 +62,10 @@ In these collectors, the "live" path always throws, so the random generator alwa
 **Done when:** `grep -rn "random\." backend/collectors` returns nothing outside the demo module, and a fresh database plus a run of every collector contains only rows that came from a real source.
 
 ### 1.2 Report collector status truthfully
-- [ ] Add statuses `partial` and `no_source` to `DataSyncLog`. Only `success` when real rows were written.
+- [x] Add statuses `partial` and `no_source` to `DataSyncLog`. Only `success` when real rows were written. Done 2026-11-23:
+  - `BaseCollector.run()` (`collectors/base_collector.py`): `success` only when rows were inserted/updated and none skipped; `partial` when a run wrote nothing or skipped rows (`self.skip(reason)`, reasons kept in `extra_info`); a collector raises `SourceUnavailableError` for `no_source` (CAPTCHA, login, no published endpoint), which is logged, not re-raised. Tests: `tests/test_collector_status.py`.
+  - Existing Postgres databases get the new enum labels on startup (`add_missing_enum_values` in `database/connection.py`, since `create_all` never alters an enum); checked on a Postgres 14 database created with the old four labels. Drop it with 3.1.
+  - Sync Status page and freshness strip show `partial` / `no_source` in amber, with the reason.
 - [ ] Fix `next_run` in `/alerts/sync-status`. It hardcodes "06:00 IST daily", but `scheduler/jobs.py` schedules weekly + monthly. Read the real next fire time from APScheduler.
 - [ ] Make the README's "Data Sources" table match the actual scheduler.
 

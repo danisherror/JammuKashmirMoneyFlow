@@ -157,11 +157,13 @@ export default function SyncStatus() {
             {COLLECTORS.filter(c => c.phase === 1).map(col => {
               const s = byName[col.name]
               const healthy = s?.is_healthy ?? false
-              const status = s?.status ?? 'NEVER RUN'
-              const dotColor = healthy ? '#00ff88' : s ? '#ff3366' : '#5a7a9a'
+              const status = (s?.status ?? 'never run').replace('_', ' ')
+              // partial = finished but wrote no rows / skipped some; no_source = nothing honest to fetch
+              const warn = s?.status === 'partial' || s?.status === 'no_source'
+              const dotColor = healthy ? '#00ff88' : warn ? '#ffb020' : s ? '#ff3366' : '#5a7a9a'
               const borderColor = healthy
                 ? 'rgba(0,255,136,0.25)'
-                : s ? 'rgba(255,51,102,0.25)' : '#1a2a3a'
+                : warn ? 'rgba(255,176,32,0.25)' : s ? 'rgba(255,51,102,0.25)' : '#1a2a3a'
 
               return (
                 <div key={col.name} className="panel space-y-4" style={{ borderColor }}>
@@ -210,9 +212,13 @@ export default function SyncStatus() {
                   {s && !s.is_healthy && (
                     <div
                       className="mono text-[8px] p-2 leading-relaxed"
-                      style={{ background: 'rgba(255,51,102,0.08)', border: '1px solid rgba(255,51,102,0.2)', color: '#ff8888' }}
+                      style={warn
+                        ? { background: 'rgba(255,176,32,0.08)', border: '1px solid rgba(255,176,32,0.2)', color: '#ffcc77' }
+                        : { background: 'rgba(255,51,102,0.08)', border: '1px solid rgba(255,51,102,0.2)', color: '#ff8888' }}
                     >
-                      <div className="text-red mb-1">LAST ERROR:</div>
+                      <div className="mb-1" style={{ color: dotColor }}>
+                        {s.status === 'no_source' ? 'NO SOURCE:' : s.status === 'partial' ? 'PARTIAL RUN:' : 'LAST ERROR:'}
+                      </div>
                       {s.error_message ? s.error_message : (
                         'Check docker logs for details. Common causes: portal maintenance window, ' +
                         'changed HTML structure, network timeout.'

@@ -50,11 +50,14 @@ export default function DataFreshness() {
       {data.map(s => {
         const healthy   = s.is_healthy
         const neverRun  = !s.last_run
-        const dotColor  = neverRun ? 'bg-slate-400' : healthy ? 'bg-emerald-400' : 'bg-rose-400'
-        const textColor = neverRun ? 'text-slate-400' : healthy ? 'text-emerald-400' : 'text-rose-400'
+        const warn      = s.status === 'partial' || s.status === 'no_source'
+        const dotColor  = neverRun ? 'bg-slate-400' : healthy ? 'bg-emerald-400' : warn ? 'bg-amber-400' : 'bg-rose-400'
+        const textColor = neverRun ? 'text-slate-400' : healthy ? 'text-emerald-400' : warn ? 'text-amber-400' : 'text-rose-400'
         const timeLabel = neverRun
           ? 'Never fetched'
-          : s.last_success
+          : s.status === 'no_source'
+            ? 'No source'
+            : s.last_success
             ? formatDistanceToNow(parseISO(s.last_success), { addSuffix: true })
             : 'Never succeeded'
 

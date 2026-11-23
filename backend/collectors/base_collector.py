@@ -13,6 +13,25 @@ from sqlalchemy.orm import Session
 from database.models import DataSyncLog, CollectorStatus
 
 
+class SourceUnavailableError(Exception):
+    """
+    Raised by a collector when there is no public, automation-friendly source
+    to collect from (CAPTCHA, login, bot block, or no published endpoint yet).
+    run() logs this as NO_SOURCE instead of FAILED: nothing broke, there is
+    simply nothing honest to fetch. Never fall back to invented data.
+    """
+
+
+def outcome_status(written: int, skipped: int) -> CollectorStatus:
+    """
+    Status of a run that finished without raising.
+    SUCCESS only when real rows were written and none were skipped.
+    """
+    if written > 0 and skipped == 0:
+        return CollectorStatus.SUCCESS
+    return CollectorStatus.PARTIAL
+
+
 class BaseCollector(ABC):
     """
     Every collector inherits from this.
@@ -32,6 +51,8 @@ class BaseCollector(ABC):
         self._records_fetched = 0
         self._records_updated = 0
         self._records_inserted = 0
+        self._records_skipped = 0
+        self._skip_reasons: list[str] = []
 
     # ── HTTP client setup ─────────────────────────────────────────────────────
 
@@ -67,6 +88,12 @@ class BaseCollector(ABC):
         response.raise_for_status()
         return response
 
+    def skip(self, reason: str):
+        """Record a fetched row that could not be saved (e.g. unknown district)."""
+        self._records_skipped += 1
+        if len(self._skip_reasons) < 20:
+            self._skip_reasons.append(reason)
+
     # ── Sync log management ───────────────────────────────────────────────────
 
     def _start_log(self) -> DataSyncLog:
@@ -90,6 +117,12 @@ class BaseCollector(ABC):
         self.sync_log.records_fetched = self._records_fetched
         self.sync_log.records_updated = self._records_updated
         self.sync_log.records_inserted = self._records_inserted
+        if self._records_skipped:
+            self.sync_log.extra_info = {
+                **(self.sync_log.extra_info or {}),
+                "records_skipped": self._records_skipped,
+                "skip_reasons": self._skip_reasons,
+            }
         if error:
             self.sync_log.error_message = error[:2000]   # truncate long stack traces
         self.db.commit()
@@ -108,11 +141,25 @@ class BaseCollector(ABC):
         self._start_log()
         try:
             self.run_collection()
-            self._finish_log(CollectorStatus.SUCCESS)
+        except SourceUnavailableError as e:
+            logger.warning(f"[{self.collector_name}] No source: {e}")
+            self.db.rollback()
+            self._finish_log(CollectorStatus.NO_SOURCE, error=str(e))
+            return
         except Exception as e:
             logger.exception(f"[{self.collector_name}] FAILED: {e}")
+            self.db.rollback()
             self._finish_log(CollectorStatus.FAILED, error=str(e))
             raise
+
+        written = self._records_inserted + self._records_updated
+        status = outcome_status(written, self._records_skipped)
+        error = None
+        if written == 0:
+            error = "Finished without writing any rows."
+        elif self._records_skipped:
+            error = f"Skipped {self._records_skipped} fetched row(s): " + "; ".join(self._skip_reasons)
+        self._finish_log(status, error=error)
 
     @abstractmethod
     def run_collection(self):
