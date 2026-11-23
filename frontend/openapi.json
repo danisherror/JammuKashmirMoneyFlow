@@ -1,0 +1,4622 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "J&K Public Money Flow API",
+    "description": "Tracks how public funds are allocated and spent across J&K UT",
+    "version": "1.0.0"
+  },
+  "paths": {
+    "/api/v1/budget/overview": {
+      "get": {
+        "tags": [
+          "Budget"
+        ],
+        "summary": "Get Budget Overview",
+        "description": "Top-level J&K budget summary for the given financial year: total, capital and revenue.\nLive and official totals are never compared here: the budget table lists only some departments,\nthe CAG accounts all grants.",
+        "operationId": "get_budget_overview_api_v1_budget_overview_get",
+        "parameters": [
+          {
+            "name": "financial_year",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "description": "Financial year e.g. 2024-25",
+              "default": "2024-25",
+              "title": "Financial Year"
+            },
+            "description": "Financial year e.g. 2024-25"
+          },
+          {
+            "name": "view",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/View"
+                }
+              ],
+              "description": "live | official | combined (default)",
+              "default": "combined",
+              "title": "View"
+            },
+            "description": "live | official | combined (default)"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BudgetOverview"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/budget/departments": {
+      "get": {
+        "tags": [
+          "Budget"
+        ],
+        "summary": "List Departments",
+        "description": "Departments with an allocation or spending figure for the year in the chosen view.\nOfficial view: only the grants mapped to a tracker department (grant_department_map).",
+        "operationId": "list_departments_api_v1_budget_departments_get",
+        "parameters": [
+          {
+            "name": "financial_year",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "2024-25",
+              "title": "Financial Year"
+            }
+          },
+          {
+            "name": "division",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by division: jammu/kashmir/central",
+              "title": "Division"
+            },
+            "description": "Filter by division: jammu/kashmir/central"
+          },
+          {
+            "name": "sort_by",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "description": "Sort by: budget_estimate | utilization_pct",
+              "default": "budget_estimate",
+              "title": "Sort By"
+            },
+            "description": "Sort by: budget_estimate | utilization_pct"
+          },
+          {
+            "name": "view",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/View"
+                }
+              ],
+              "description": "live | official | combined (default)",
+              "default": "combined",
+              "title": "View"
+            },
+            "description": "live | official | combined (default)"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/DepartmentSummary"
+                  },
+                  "title": "Response List Departments Api V1 Budget Departments Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/budget/departments/{dept_id}": {
+      "get": {
+        "tags": [
+          "Budget"
+        ],
+        "summary": "Get Department Detail",
+        "description": "Single department: totals in the chosen view, the live monthly expenditure trend, and (official\nand combined views) the audited original → final grant → spent chain of its mapped grants.",
+        "operationId": "get_department_detail_api_v1_budget_departments__dept_id__get",
+        "parameters": [
+          {
+            "name": "dept_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Dept Id"
+            }
+          },
+          {
+            "name": "financial_year",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "2024-25",
+              "title": "Financial Year"
+            }
+          },
+          {
+            "name": "view",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/View"
+                }
+              ],
+              "description": "live | official | combined (default)",
+              "default": "combined",
+              "title": "View"
+            },
+            "description": "live | official | combined (default)"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DepartmentDetail"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/budget/gap-analysis": {
+      "get": {
+        "tags": [
+          "Budget"
+        ],
+        "summary": "Get Gap Analysis",
+        "description": "Departments ranked by their unspent budget gap: (PFMS release, or the allocation when no release\nfigure exists) − utilised. Departments with no spending figure get gap_flag \"no_data\", not 0%.",
+        "operationId": "get_gap_analysis_api_v1_budget_gap_analysis_get",
+        "parameters": [
+          {
+            "name": "financial_year",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "2024-25",
+              "title": "Financial Year"
+            }
+          },
+          {
+            "name": "min_allocation_lakhs",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "description": "Minimum allocation to include (in lakhs)",
+              "default": 10000,
+              "title": "Min Allocation Lakhs"
+            },
+            "description": "Minimum allocation to include (in lakhs)"
+          },
+          {
+            "name": "view",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/View"
+                }
+              ],
+              "description": "live | official | combined (default)",
+              "default": "combined",
+              "title": "View"
+            },
+            "description": "live | official | combined (default)"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/GapAnalysisItem"
+                  },
+                  "title": "Response Get Gap Analysis Api V1 Budget Gap Analysis Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/budget/grants": {
+      "get": {
+        "tags": [
+          "Budget"
+        ],
+        "summary": "Get Grants",
+        "description": "Every grant in the year's CAG accounts, including those not mapped to a tracker department.",
+        "operationId": "get_grants_api_v1_budget_grants_get",
+        "parameters": [
+          {
+            "name": "financial_year",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Financial year, e.g. 2023-24. Default: the latest year with CAG grant pages loaded",
+              "title": "Financial Year"
+            },
+            "description": "Financial year, e.g. 2023-24. Default: the latest year with CAG grant pages loaded"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/GrantInfo"
+                  },
+                  "title": "Response Get Grants Api V1 Budget Grants Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/budget/departments/{dept_id}/breakdown": {
+      "get": {
+        "tags": [
+          "Budget"
+        ],
+        "summary": "Get Department Breakdown",
+        "description": "Where a department's audited grant went: section blocks, the head tree from the Notes and\nComments (amounts, verbatim remark, PDF page) and the notes themselves. Official figures only,\nso there is no `view` parameter. The head rows are the heads the CAG chose to comment on; they\ndon't add up to the grant total.",
+        "operationId": "get_department_breakdown_api_v1_budget_departments__dept_id__breakdown_get",
+        "parameters": [
+          {
+            "name": "dept_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Dept Id"
+            }
+          },
+          {
+            "name": "financial_year",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Financial year, e.g. 2023-24. Default: the latest year with CAG grant pages loaded",
+              "title": "Financial Year"
+            },
+            "description": "Financial year, e.g. 2023-24. Default: the latest year with CAG grant pages loaded"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GrantBreakdown"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/budget/grants/{grant_no}/breakdown": {
+      "get": {
+        "tags": [
+          "Budget"
+        ],
+        "summary": "Get Grant Breakdown",
+        "description": "The same breakdown for one grant number, mapped to a tracker department or not.",
+        "operationId": "get_grant_breakdown_api_v1_budget_grants__grant_no__breakdown_get",
+        "parameters": [
+          {
+            "name": "grant_no",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Grant No"
+            }
+          },
+          {
+            "name": "financial_year",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Financial year, e.g. 2023-24. Default: the latest year with CAG grant pages loaded",
+              "title": "Financial Year"
+            },
+            "description": "Financial year, e.g. 2023-24. Default: the latest year with CAG grant pages loaded"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GrantBreakdown"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/schemes": {
+      "get": {
+        "tags": [
+          "Schemes"
+        ],
+        "summary": "List Schemes",
+        "description": "All schemes with their aggregate financial progress (2 queries).",
+        "operationId": "list_schemes_api_v1_schemes_get",
+        "parameters": [
+          {
+            "name": "financial_year",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "2024-25",
+              "title": "Financial Year"
+            }
+          },
+          {
+            "name": "scheme_type",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "css | central | ut",
+              "title": "Scheme Type"
+            },
+            "description": "css | central | ut"
+          },
+          {
+            "name": "department_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Department Id"
+            }
+          },
+          {
+            "name": "view",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/View"
+                }
+              ],
+              "description": "live | official | combined (default)",
+              "default": "combined",
+              "title": "View"
+            },
+            "description": "live | official | combined (default)"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/SchemeSummary"
+                  },
+                  "title": "Response List Schemes Api V1 Schemes Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/schemes/{scheme_id}": {
+      "get": {
+        "tags": [
+          "Schemes"
+        ],
+        "summary": "Get Scheme Detail",
+        "description": "Full scheme detail with district-wise breakdown.",
+        "operationId": "get_scheme_detail_api_v1_schemes__scheme_id__get",
+        "parameters": [
+          {
+            "name": "scheme_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Scheme Id"
+            }
+          },
+          {
+            "name": "financial_year",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "2024-25",
+              "title": "Financial Year"
+            }
+          },
+          {
+            "name": "view",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/View"
+                }
+              ],
+              "description": "live | official | combined (default)",
+              "default": "combined",
+              "title": "View"
+            },
+            "description": "live | official | combined (default)"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SchemeDetail"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/schemes/{scheme_id}/history": {
+      "get": {
+        "tags": [
+          "Schemes"
+        ],
+        "summary": "Get Scheme Velocity",
+        "description": "Time-series of spending for a scheme + run-rate projection to March 31st.\n\nMath:\n  daily_run_rate = total_utilized_so_far / days_elapsed_in_FY\n  projected_utilized = current_utilized + (daily_run_rate * days_remaining)\n  on_track = projected_utilized >= total_allocated",
+        "operationId": "get_scheme_velocity_api_v1_schemes__scheme_id__history_get",
+        "parameters": [
+          {
+            "name": "scheme_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Scheme Id"
+            }
+          },
+          {
+            "name": "financial_year",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "2024-25",
+              "title": "Financial Year"
+            }
+          },
+          {
+            "name": "view",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/View"
+                }
+              ],
+              "description": "live | official | combined (default)",
+              "default": "combined",
+              "title": "View"
+            },
+            "description": "live | official | combined (default)"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SchemeVelocity"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/districts/heatmap": {
+      "get": {
+        "tags": [
+          "Districts"
+        ],
+        "summary": "Get District Heatmap",
+        "description": "Returns all 20 districts with aggregated fund absorption scores.\nFixed: was N+1 queries (1 per district); now 2 queries total.",
+        "operationId": "get_district_heatmap_api_v1_districts_heatmap_get",
+        "parameters": [
+          {
+            "name": "financial_year",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "2024-25",
+              "title": "Financial Year"
+            }
+          },
+          {
+            "name": "scheme_code",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by specific scheme",
+              "title": "Scheme Code"
+            },
+            "description": "Filter by specific scheme"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/DistrictHeatmapItem"
+                  },
+                  "title": "Response Get District Heatmap Api V1 Districts Heatmap Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/districts/{district_id}": {
+      "get": {
+        "tags": [
+          "Districts"
+        ],
+        "summary": "Get District Detail",
+        "description": "Full district detail: all scheme progress in that district.",
+        "operationId": "get_district_detail_api_v1_districts__district_id__get",
+        "parameters": [
+          {
+            "name": "district_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "District Id"
+            }
+          },
+          {
+            "name": "financial_year",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "2024-25",
+              "title": "Financial Year"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DistrictDetail"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/alerts/sync-status": {
+      "get": {
+        "tags": [
+          "Alerts"
+        ],
+        "summary": "Get Sync Status",
+        "description": "Health check for all data collectors.\nShows last run time, status, records updated, and the next scheduled run\nas reported by APScheduler (null when the scheduler is disabled).\nDrives the SyncStatusPanel on the frontend.",
+        "operationId": "get_sync_status_api_v1_alerts_sync_status_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/SyncStatusItem"
+                  },
+                  "type": "array",
+                  "title": "Response Get Sync Status Api V1 Alerts Sync Status Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/alerts/low-utilization": {
+      "get": {
+        "tags": [
+          "Alerts"
+        ],
+        "summary": "Get Low Utilization Alerts",
+        "description": "Returns scheme-district combinations with dangerously low fund utilization.\nThese represent 'dead money' — allocated but not reaching the ground.",
+        "operationId": "get_low_utilization_alerts_api_v1_alerts_low_utilization_get",
+        "parameters": [
+          {
+            "name": "financial_year",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "2024-25",
+              "title": "Financial Year"
+            }
+          },
+          {
+            "name": "threshold_pct",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "number",
+              "description": "Flag schemes below this utilization %",
+              "default": 40.0,
+              "title": "Threshold Pct"
+            },
+            "description": "Flag schemes below this utilization %"
+          },
+          {
+            "name": "min_allocation_lakhs",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "description": "Only flag if allocation > this",
+              "default": 5000,
+              "title": "Min Allocation Lakhs"
+            },
+            "description": "Only flag if allocation > this"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/LowUtilizationAlert"
+                  },
+                  "title": "Response Get Low Utilization Alerts Api V1 Alerts Low Utilization Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/alerts/trigger/{collector_name}": {
+      "post": {
+        "tags": [
+          "Alerts"
+        ],
+        "summary": "Trigger Collector",
+        "description": "Manually trigger a specific collector.\nUseful for testing or forcing a refresh outside the schedule.",
+        "operationId": "trigger_collector_api_v1_alerts_trigger__collector_name__post",
+        "parameters": [
+          {
+            "name": "collector_name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Collector Name"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TriggerResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/alerts/trigger-all": {
+      "post": {
+        "tags": [
+          "Alerts"
+        ],
+        "summary": "Trigger All Collectors",
+        "description": "Manually trigger ALL collectors for a specific financial year.\nUsed by the frontend to auto-fetch historical data if it's missing.",
+        "operationId": "trigger_all_collectors_api_v1_alerts_trigger_all_post",
+        "parameters": [
+          {
+            "name": "financial_year",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "2024-25",
+              "title": "Financial Year"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TriggerResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/alerts/cag-findings": {
+      "get": {
+        "tags": [
+          "Alerts"
+        ],
+        "summary": "Get Cag Findings",
+        "description": "Return CAG audit findings for the feed UI.",
+        "operationId": "get_cag_findings_api_v1_alerts_cag_findings_get",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 50,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/CAGFindingItem"
+                  },
+                  "title": "Response Get Cag Findings Api V1 Alerts Cag Findings Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/alerts/accountability": {
+      "get": {
+        "tags": [
+          "Alerts"
+        ],
+        "summary": "Get Accountability Flags",
+        "description": "Accountability flags for every grant, computed at query time from the stored grant pages of\nthe CAG Appropriation Accounts (see processors.accountability). Each links to its PDF page.",
+        "operationId": "get_accountability_flags_api_v1_alerts_accountability_get",
+        "parameters": [
+          {
+            "name": "financial_year",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "e.g. 2023-24. Default: the latest year with CAG grant pages loaded",
+              "title": "Financial Year"
+            },
+            "description": "e.g. 2023-24. Default: the latest year with CAG grant pages loaded"
+          },
+          {
+            "name": "kind",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "excess_over_grant | savings_not_surrendered | supplementary_not_needed | fully_unutilised | reasons_not_communicated",
+              "title": "Kind"
+            },
+            "description": "excess_over_grant | savings_not_surrendered | supplementary_not_needed | fully_unutilised | reasons_not_communicated"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 5000,
+              "minimum": 1,
+              "default": 500,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/AccountabilityFlag"
+                  },
+                  "title": "Response Get Accountability Flags Api V1 Alerts Accountability Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/export/schemes": {
+      "get": {
+        "tags": [
+          "Export"
+        ],
+        "summary": "Export scheme progress as CSV",
+        "description": "Download all scheme-district progress data as a clean CSV file.",
+        "operationId": "export_schemes_api_v1_export_schemes_get",
+        "parameters": [
+          {
+            "name": "financial_year",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "2024-25",
+              "title": "Financial Year"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/export/tenders": {
+      "get": {
+        "tags": [
+          "Export"
+        ],
+        "summary": "Export all tenders as CSV",
+        "description": "Download all tender data as a clean CSV file.",
+        "operationId": "export_tenders_api_v1_export_tenders_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/export/dbt": {
+      "get": {
+        "tags": [
+          "Export"
+        ],
+        "summary": "Export DBT transfer data as CSV",
+        "description": "Download all Direct Benefit Transfer data as a clean CSV file.",
+        "operationId": "export_dbt_api_v1_export_dbt_get",
+        "parameters": [
+          {
+            "name": "financial_year",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "2024-25",
+              "title": "Financial Year"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/export/zip": {
+      "get": {
+        "tags": [
+          "Export"
+        ],
+        "summary": "Export full database as ZIP of CSVs",
+        "description": "Download a ZIP file containing all datasets as individual CSV files.\nPerfect for researchers, journalists, and NGOs.",
+        "operationId": "export_zip_api_v1_export_zip_get",
+        "parameters": [
+          {
+            "name": "financial_year",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "2024-25",
+              "title": "Financial Year"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/export/gap-analysis": {
+      "get": {
+        "tags": [
+          "Export"
+        ],
+        "summary": "Export gap analysis as CSV",
+        "description": "Download department-level fund gap analysis as CSV.",
+        "operationId": "export_gap_analysis_api_v1_export_gap_analysis_get",
+        "parameters": [
+          {
+            "name": "financial_year",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "2024-25",
+              "title": "Financial Year"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/export/cag-findings": {
+      "get": {
+        "tags": [
+          "Export"
+        ],
+        "summary": "Export CAG audit findings as CSV",
+        "description": "Download all CAG audit findings as CSV.",
+        "operationId": "export_cag_findings_api_v1_export_cag_findings_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/tenders": {
+      "get": {
+        "tags": [
+          "Tenders"
+        ],
+        "summary": "List Tenders",
+        "description": "Get recent tenders, optionally filtered by department or status.",
+        "operationId": "list_tenders_api_v1_tenders_get",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "department_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Department Id"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/TenderSummary"
+                  },
+                  "title": "Response List Tenders Api V1 Tenders Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/tenders/contractors": {
+      "get": {
+        "tags": [
+          "Tenders"
+        ],
+        "summary": "Contractor Leaderboard",
+        "description": "Get the top contractors by total awarded value.",
+        "operationId": "contractor_leaderboard_api_v1_tenders_contractors_get",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 20,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ContractorLeaderboardItem"
+                  },
+                  "title": "Response Contractor Leaderboard Api V1 Tenders Contractors Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/dbt/schemes": {
+      "get": {
+        "tags": [
+          "DBT"
+        ],
+        "summary": "List Dbt Schemes",
+        "description": "Aggregate DBT data per scheme (sum across all districts).",
+        "operationId": "list_dbt_schemes_api_v1_dbt_schemes_get",
+        "parameters": [
+          {
+            "name": "financial_year",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "2024-25",
+              "title": "Financial Year"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/DBTSchemeSummary"
+                  },
+                  "title": "Response List Dbt Schemes Api V1 Dbt Schemes Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/dbt/schemes/{scheme_id}/gap": {
+      "get": {
+        "tags": [
+          "DBT"
+        ],
+        "summary": "Dbt Scheme Gap",
+        "description": "Get district-wise last-mile gap for a specific DBT scheme.",
+        "operationId": "dbt_scheme_gap_api_v1_dbt_schemes__scheme_id__gap_get",
+        "parameters": [
+          {
+            "name": "scheme_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Scheme Id"
+            }
+          },
+          {
+            "name": "financial_year",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "2024-25",
+              "title": "Financial Year"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/DBTDistrictGap"
+                  },
+                  "title": "Response Dbt Scheme Gap Api V1 Dbt Schemes  Scheme Id  Gap Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/health": {
+      "get": {
+        "summary": "Health",
+        "operationId": "health_api_v1_health_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "AccountabilityFlag": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "excess_over_grant",
+              "savings_not_surrendered",
+              "supplementary_not_needed",
+              "fully_unutilised",
+              "reasons_not_communicated"
+            ],
+            "title": "Kind"
+          },
+          "financial_year": {
+            "type": "string",
+            "title": "Financial Year"
+          },
+          "grant_no": {
+            "type": "integer",
+            "title": "Grant No"
+          },
+          "grant_name": {
+            "type": "string",
+            "title": "Grant Name"
+          },
+          "department_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Department Id"
+          },
+          "section": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Section"
+          },
+          "block_kind": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Block Kind",
+            "description": "voted | charged"
+          },
+          "head_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Head Code"
+          },
+          "head_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Head Name"
+          },
+          "amount_lakhs": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Amount Lakhs",
+            "description": "The amount the flag is about, ₹ lakhs"
+          },
+          "share_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Share Pct",
+            "description": "reasons_not_communicated: share of commented heads"
+          },
+          "detail": {
+            "type": "string",
+            "title": "Detail"
+          },
+          "source": {
+            "$ref": "#/components/schemas/FigureSource"
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind",
+          "financial_year",
+          "grant_no",
+          "grant_name",
+          "department_id",
+          "detail",
+          "source"
+        ],
+        "title": "AccountabilityFlag",
+        "description": "A fact worth a citizen's attention, restated from the printed figures (processors.accountability)."
+      },
+      "BudgetOverview": {
+        "properties": {
+          "view": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/View"
+              }
+            ],
+            "default": "combined"
+          },
+          "sources": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/FigureSource"
+            },
+            "type": "object",
+            "title": "Sources",
+            "default": {}
+          },
+          "financial_year": {
+            "type": "string",
+            "title": "Financial Year"
+          },
+          "total_budget_lakhs": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total Budget Lakhs"
+          },
+          "total_capital_lakhs": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total Capital Lakhs"
+          },
+          "total_revenue_lakhs": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total Revenue Lakhs"
+          },
+          "capital_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Capital Pct"
+          },
+          "revenue_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Revenue Pct"
+          },
+          "total_departments": {
+            "type": "integer",
+            "title": "Total Departments"
+          },
+          "data_as_of": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Data As Of"
+          },
+          "official_chain": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/OfficialChain"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "financial_year",
+          "total_budget_lakhs",
+          "total_capital_lakhs",
+          "total_revenue_lakhs",
+          "capital_pct",
+          "revenue_pct",
+          "total_departments",
+          "data_as_of"
+        ],
+        "title": "BudgetOverview"
+      },
+      "CAGFindingItem": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "report_year": {
+            "type": "integer",
+            "title": "Report Year"
+          },
+          "report_title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Report Title"
+          },
+          "department_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Department Name"
+          },
+          "finding_summary": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finding Summary"
+          },
+          "finding_raw": {
+            "type": "string",
+            "title": "Finding Raw"
+          },
+          "amount_flagged_lakhs": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Amount Flagged Lakhs"
+          },
+          "severity": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "high",
+                  "medium",
+                  "low"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Severity"
+          },
+          "paragraph_ref": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Paragraph Ref"
+          },
+          "source_pdf_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Pdf Url"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "report_year",
+          "report_title",
+          "department_name",
+          "finding_summary",
+          "finding_raw",
+          "amount_flagged_lakhs",
+          "severity",
+          "paragraph_ref",
+          "source_pdf_url"
+        ],
+        "title": "CAGFindingItem",
+        "description": "One row of GET /alerts/cag-findings."
+      },
+      "ContractorLeaderboardItem": {
+        "properties": {
+          "contractor_name": {
+            "type": "string",
+            "title": "Contractor Name"
+          },
+          "total_tenders_won": {
+            "type": "integer",
+            "title": "Total Tenders Won"
+          },
+          "total_awarded_lakhs": {
+            "type": "integer",
+            "title": "Total Awarded Lakhs"
+          }
+        },
+        "type": "object",
+        "required": [
+          "contractor_name",
+          "total_tenders_won",
+          "total_awarded_lakhs"
+        ],
+        "title": "ContractorLeaderboardItem"
+      },
+      "DBTDistrictGap": {
+        "properties": {
+          "district_id": {
+            "type": "integer",
+            "title": "District Id"
+          },
+          "district_name": {
+            "type": "string",
+            "title": "District Name"
+          },
+          "district_code": {
+            "type": "string",
+            "title": "District Code"
+          },
+          "beneficiaries_enrolled": {
+            "type": "integer",
+            "title": "Beneficiaries Enrolled"
+          },
+          "beneficiaries_paid": {
+            "type": "integer",
+            "title": "Beneficiaries Paid"
+          },
+          "amount_transferred_lakhs": {
+            "type": "integer",
+            "title": "Amount Transferred Lakhs"
+          },
+          "last_mile_gap_pct": {
+            "type": "number",
+            "title": "Last Mile Gap Pct"
+          }
+        },
+        "type": "object",
+        "required": [
+          "district_id",
+          "district_name",
+          "district_code",
+          "beneficiaries_enrolled",
+          "beneficiaries_paid",
+          "amount_transferred_lakhs",
+          "last_mile_gap_pct"
+        ],
+        "title": "DBTDistrictGap"
+      },
+      "DBTSchemeSummary": {
+        "properties": {
+          "scheme_id": {
+            "type": "integer",
+            "title": "Scheme Id"
+          },
+          "scheme_name": {
+            "type": "string",
+            "title": "Scheme Name"
+          },
+          "scheme_code": {
+            "type": "string",
+            "title": "Scheme Code"
+          },
+          "financial_year": {
+            "type": "string",
+            "title": "Financial Year"
+          },
+          "total_beneficiaries_enrolled": {
+            "type": "integer",
+            "title": "Total Beneficiaries Enrolled"
+          },
+          "total_beneficiaries_paid": {
+            "type": "integer",
+            "title": "Total Beneficiaries Paid"
+          },
+          "total_amount_transferred_lakhs": {
+            "type": "integer",
+            "title": "Total Amount Transferred Lakhs"
+          },
+          "overall_gap_pct": {
+            "type": "number",
+            "title": "Overall Gap Pct"
+          }
+        },
+        "type": "object",
+        "required": [
+          "scheme_id",
+          "scheme_name",
+          "scheme_code",
+          "financial_year",
+          "total_beneficiaries_enrolled",
+          "total_beneficiaries_paid",
+          "total_amount_transferred_lakhs",
+          "overall_gap_pct"
+        ],
+        "title": "DBTSchemeSummary"
+      },
+      "DepartmentDetail": {
+        "properties": {
+          "view": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/View"
+              }
+            ],
+            "default": "combined"
+          },
+          "sources": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/FigureSource"
+            },
+            "type": "object",
+            "title": "Sources",
+            "default": {}
+          },
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "code": {
+            "type": "string",
+            "title": "Code"
+          },
+          "division": {
+            "$ref": "#/components/schemas/DivisionEnum"
+          },
+          "financial_year": {
+            "type": "string",
+            "title": "Financial Year"
+          },
+          "budget_estimate_lakhs": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Budget Estimate Lakhs"
+          },
+          "revised_estimate_lakhs": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Revised Estimate Lakhs"
+          },
+          "utilized_lakhs": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Utilized Lakhs"
+          },
+          "utilization_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Utilization Pct"
+          },
+          "is_capital": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Is Capital"
+          },
+          "data_as_of": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Data As Of"
+          },
+          "monthly_expenditure": {
+            "items": {
+              "$ref": "#/components/schemas/MonthlyExpenditure"
+            },
+            "type": "array",
+            "title": "Monthly Expenditure",
+            "default": []
+          },
+          "schemes": {
+            "items": {
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Schemes",
+            "default": []
+          },
+          "year_over_year": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/YearOverYear"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "official_chain": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/OfficialChain"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Audited original → final grant → spent chain; null in the live view or for a year without CAG accounts"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "code",
+          "division",
+          "financial_year",
+          "budget_estimate_lakhs",
+          "revised_estimate_lakhs",
+          "utilized_lakhs",
+          "utilization_pct",
+          "is_capital",
+          "data_as_of"
+        ],
+        "title": "DepartmentDetail"
+      },
+      "DepartmentSummary": {
+        "properties": {
+          "view": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/View"
+              }
+            ],
+            "default": "combined"
+          },
+          "sources": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/FigureSource"
+            },
+            "type": "object",
+            "title": "Sources",
+            "default": {}
+          },
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "code": {
+            "type": "string",
+            "title": "Code"
+          },
+          "division": {
+            "$ref": "#/components/schemas/DivisionEnum"
+          },
+          "financial_year": {
+            "type": "string",
+            "title": "Financial Year"
+          },
+          "budget_estimate_lakhs": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Budget Estimate Lakhs"
+          },
+          "revised_estimate_lakhs": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Revised Estimate Lakhs"
+          },
+          "utilized_lakhs": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Utilized Lakhs"
+          },
+          "utilization_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Utilization Pct"
+          },
+          "is_capital": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Is Capital"
+          },
+          "data_as_of": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Data As Of"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "code",
+          "division",
+          "financial_year",
+          "budget_estimate_lakhs",
+          "revised_estimate_lakhs",
+          "utilized_lakhs",
+          "utilization_pct",
+          "is_capital",
+          "data_as_of"
+        ],
+        "title": "DepartmentSummary"
+      },
+      "DistrictDetail": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "code": {
+            "type": "string",
+            "title": "Code"
+          },
+          "division": {
+            "$ref": "#/components/schemas/DivisionEnum"
+          },
+          "population": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Population"
+          },
+          "is_border_district": {
+            "type": "boolean",
+            "title": "Is Border District"
+          },
+          "avg_utilization_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Avg Utilization Pct"
+          },
+          "total_funds_allocated_lakhs": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total Funds Allocated Lakhs"
+          },
+          "total_funds_utilized_lakhs": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total Funds Utilized Lakhs"
+          },
+          "active_schemes_count": {
+            "type": "integer",
+            "title": "Active Schemes Count"
+          },
+          "absorption_score": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Absorption Score"
+          },
+          "absorption_grade": {
+            "type": "string",
+            "enum": [
+              "A",
+              "B",
+              "C",
+              "D",
+              "F"
+            ],
+            "title": "Absorption Grade"
+          },
+          "scheme_progress": {
+            "items": {
+              "$ref": "#/components/schemas/SchemeDistrictProgress"
+            },
+            "type": "array",
+            "title": "Scheme Progress",
+            "default": []
+          },
+          "dbt_summary": {
+            "anyOf": [
+              {
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dbt Summary"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "code",
+          "division",
+          "population",
+          "is_border_district",
+          "avg_utilization_pct",
+          "total_funds_allocated_lakhs",
+          "total_funds_utilized_lakhs",
+          "active_schemes_count",
+          "absorption_score",
+          "absorption_grade"
+        ],
+        "title": "DistrictDetail"
+      },
+      "DistrictHeatmapItem": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "code": {
+            "type": "string",
+            "title": "Code"
+          },
+          "division": {
+            "$ref": "#/components/schemas/DivisionEnum"
+          },
+          "population": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Population"
+          },
+          "is_border_district": {
+            "type": "boolean",
+            "title": "Is Border District"
+          },
+          "avg_utilization_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Avg Utilization Pct"
+          },
+          "total_funds_allocated_lakhs": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total Funds Allocated Lakhs"
+          },
+          "total_funds_utilized_lakhs": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total Funds Utilized Lakhs"
+          },
+          "active_schemes_count": {
+            "type": "integer",
+            "title": "Active Schemes Count"
+          },
+          "absorption_score": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Absorption Score"
+          },
+          "absorption_grade": {
+            "type": "string",
+            "enum": [
+              "A",
+              "B",
+              "C",
+              "D",
+              "F"
+            ],
+            "title": "Absorption Grade"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "code",
+          "division",
+          "population",
+          "is_border_district",
+          "avg_utilization_pct",
+          "total_funds_allocated_lakhs",
+          "total_funds_utilized_lakhs",
+          "active_schemes_count",
+          "absorption_score",
+          "absorption_grade"
+        ],
+        "title": "DistrictHeatmapItem"
+      },
+      "DivisionEnum": {
+        "type": "string",
+        "enum": [
+          "jammu",
+          "kashmir",
+          "central"
+        ],
+        "title": "DivisionEnum"
+      },
+      "DocumentIssueItem": {
+        "properties": {
+          "grant_no": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Grant No"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "skipped_table",
+              "misfiled",
+              "footnote",
+              "headerless_table"
+            ],
+            "title": "Kind"
+          },
+          "page": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Page"
+          },
+          "text": {
+            "type": "string",
+            "title": "Text"
+          }
+        },
+        "type": "object",
+        "required": [
+          "grant_no",
+          "kind",
+          "page",
+          "text"
+        ],
+        "title": "DocumentIssueItem",
+        "description": "Something the parser kept aside rather than guessing (a non-head table, a misfiled row, a footnote)."
+      },
+      "FigureSource": {
+        "properties": {
+          "source_type": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "live",
+                  "official"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Type",
+            "description": "null when there is no data"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label",
+            "description": "e.g. \"Official · Appropriation Accounts 2022-23, p.4\""
+          },
+          "measure": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Measure",
+            "description": "What the number is: budget_estimate, revised_estimate, final_grant (original + supplementary), gross_expenditure, utilized, released, allocated"
+          },
+          "source_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Url"
+          },
+          "snapshot_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Snapshot Id",
+            "description": "source_snapshots.id of the saved document"
+          },
+          "page": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Page",
+            "description": "First page of the figure in the snapshot PDF"
+          },
+          "fetched_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fetched At"
+          },
+          "provisional": {
+            "type": "boolean",
+            "title": "Provisional",
+            "default": false
+          },
+          "mismatch": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MismatchInfo"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "source_type",
+          "label"
+        ],
+        "title": "FigureSource",
+        "description": "Where one figure in the response comes from. Keyed by the figure's field name in `sources`."
+      },
+      "GapAnalysisItem": {
+        "properties": {
+          "view": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/View"
+              }
+            ],
+            "default": "combined"
+          },
+          "sources": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/FigureSource"
+            },
+            "type": "object",
+            "title": "Sources",
+            "default": {}
+          },
+          "department_id": {
+            "type": "integer",
+            "title": "Department Id"
+          },
+          "department_name": {
+            "type": "string",
+            "title": "Department Name"
+          },
+          "department_code": {
+            "type": "string",
+            "title": "Department Code"
+          },
+          "allocated_lakhs": {
+            "type": "number",
+            "title": "Allocated Lakhs"
+          },
+          "released_lakhs": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Released Lakhs"
+          },
+          "utilized_lakhs": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Utilized Lakhs"
+          },
+          "gap_lakhs": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Gap Lakhs"
+          },
+          "utilization_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Utilization Pct"
+          },
+          "gap_flag": {
+            "type": "string",
+            "enum": [
+              "critical",
+              "warning",
+              "on_track",
+              "no_data"
+            ],
+            "title": "Gap Flag"
+          }
+        },
+        "type": "object",
+        "required": [
+          "department_id",
+          "department_name",
+          "department_code",
+          "allocated_lakhs",
+          "released_lakhs",
+          "utilized_lakhs",
+          "gap_lakhs",
+          "utilization_pct",
+          "gap_flag"
+        ],
+        "title": "GapAnalysisItem"
+      },
+      "GrantBreakdown": {
+        "properties": {
+          "financial_year": {
+            "type": "string",
+            "title": "Financial Year"
+          },
+          "department_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Department Id"
+          },
+          "grants": {
+            "items": {
+              "$ref": "#/components/schemas/GrantInfo"
+            },
+            "type": "array",
+            "title": "Grants"
+          },
+          "section_blocks": {
+            "items": {
+              "$ref": "#/components/schemas/SectionBlockItem"
+            },
+            "type": "array",
+            "title": "Section Blocks"
+          },
+          "tree": {
+            "items": {
+              "$ref": "#/components/schemas/HeadNode"
+            },
+            "type": "array",
+            "title": "Tree"
+          },
+          "notes": {
+            "items": {
+              "$ref": "#/components/schemas/NoteItem"
+            },
+            "type": "array",
+            "title": "Notes"
+          },
+          "issues": {
+            "items": {
+              "$ref": "#/components/schemas/DocumentIssueItem"
+            },
+            "type": "array",
+            "title": "Issues"
+          },
+          "flags": {
+            "items": {
+              "$ref": "#/components/schemas/AccountabilityFlag"
+            },
+            "type": "array",
+            "title": "Flags",
+            "default": []
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note",
+            "description": "Why the breakdown is empty, when it is"
+          }
+        },
+        "type": "object",
+        "required": [
+          "financial_year",
+          "department_id",
+          "grants",
+          "section_blocks",
+          "tree",
+          "notes",
+          "issues"
+        ],
+        "title": "GrantBreakdown",
+        "description": "Where a department's (or one grant's) money went, from the grant pages of the CAG Appropriation\nAccounts. The notes list only the heads with notable savings, excesses or unspent provisions,\nso the head rows do not add up to the grant total; the section blocks do."
+      },
+      "GrantInfo": {
+        "properties": {
+          "grant_no": {
+            "type": "integer",
+            "title": "Grant No"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Official grant name as printed in the summary table"
+          },
+          "department_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Department Id",
+            "description": "Tracker department, via grant_department_map; null if unmapped"
+          },
+          "final_grant_lakhs": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Final Grant Lakhs"
+          },
+          "gross_expenditure_lakhs": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Gross Expenditure Lakhs"
+          }
+        },
+        "type": "object",
+        "required": [
+          "grant_no",
+          "name",
+          "department_id"
+        ],
+        "title": "GrantInfo"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "HeadNode": {
+        "properties": {
+          "level": {
+            "type": "string",
+            "enum": [
+              "major",
+              "sub_major",
+              "minor",
+              "sub_head",
+              "detailed"
+            ],
+            "title": "Level"
+          },
+          "code": {
+            "type": "string",
+            "title": "Code"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "head_code": {
+            "type": "string",
+            "title": "Head Code",
+            "description": "Codes from the major head down to this node, joined by dots"
+          },
+          "section": {
+            "type": "string",
+            "title": "Section"
+          },
+          "grant_no": {
+            "type": "integer",
+            "title": "Grant No"
+          },
+          "rows": {
+            "items": {
+              "$ref": "#/components/schemas/HeadRowItem"
+            },
+            "type": "array",
+            "title": "Rows",
+            "description": "Note rows for exactly this head"
+          },
+          "children": {
+            "items": {
+              "$ref": "#/components/schemas/HeadNode"
+            },
+            "type": "array",
+            "title": "Children",
+            "default": []
+          }
+        },
+        "type": "object",
+        "required": [
+          "level",
+          "code",
+          "name",
+          "head_code",
+          "section",
+          "grant_no",
+          "rows"
+        ],
+        "title": "HeadNode",
+        "description": "A node of the head tree (major → sub-major → minor → sub-head → detailed head)."
+      },
+      "HeadPathPart": {
+        "properties": {
+          "level": {
+            "type": "string",
+            "enum": [
+              "major",
+              "sub_major",
+              "minor",
+              "sub_head",
+              "detailed"
+            ],
+            "title": "Level"
+          },
+          "code": {
+            "type": "string",
+            "title": "Code"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          }
+        },
+        "type": "object",
+        "required": [
+          "level",
+          "code",
+          "name"
+        ],
+        "title": "HeadPathPart"
+      },
+      "HeadRowItem": {
+        "properties": {
+          "grant_no": {
+            "type": "integer",
+            "title": "Grant No"
+          },
+          "section": {
+            "type": "string",
+            "title": "Section"
+          },
+          "kind": {
+            "type": "string",
+            "title": "Kind"
+          },
+          "note_number": {
+            "type": "integer",
+            "title": "Note Number"
+          },
+          "category": {
+            "type": "string",
+            "enum": [
+              "saving",
+              "excess",
+              "unutilised",
+              "unutilised_supplementary",
+              "without_provision",
+              "comment"
+            ],
+            "title": "Category"
+          },
+          "reasons_not_communicated": {
+            "type": "boolean",
+            "title": "Reasons Not Communicated"
+          },
+          "head_code": {
+            "type": "string",
+            "title": "Head Code"
+          },
+          "head_name": {
+            "type": "string",
+            "title": "Head Name"
+          },
+          "head_path": {
+            "items": {
+              "$ref": "#/components/schemas/HeadPathPart"
+            },
+            "type": "array",
+            "title": "Head Path"
+          },
+          "original_lakhs": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Original Lakhs"
+          },
+          "supplementary_lakhs": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Supplementary Lakhs"
+          },
+          "reappropriation_lakhs": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reappropriation Lakhs"
+          },
+          "final_grant_lakhs": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Final Grant Lakhs"
+          },
+          "expenditure_lakhs": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expenditure Lakhs"
+          },
+          "saving_lakhs": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Saving Lakhs"
+          },
+          "excess_lakhs": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Excess Lakhs"
+          },
+          "remark": {
+            "type": "string",
+            "title": "Remark",
+            "description": "Official remark, verbatim"
+          },
+          "printed_error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Printed Error",
+            "description": "Set when the printed figures don't add up in the PDF itself"
+          },
+          "source": {
+            "$ref": "#/components/schemas/FigureSource"
+          }
+        },
+        "type": "object",
+        "required": [
+          "grant_no",
+          "section",
+          "kind",
+          "note_number",
+          "category",
+          "reasons_not_communicated",
+          "head_code",
+          "head_name",
+          "head_path",
+          "original_lakhs",
+          "supplementary_lakhs",
+          "reappropriation_lakhs",
+          "final_grant_lakhs",
+          "expenditure_lakhs",
+          "saving_lakhs",
+          "excess_lakhs",
+          "remark",
+          "printed_error",
+          "source"
+        ],
+        "title": "HeadRowItem",
+        "description": "One row of a note table (₹ lakhs). Amounts the PDF doesn't print are null, not 0."
+      },
+      "LowUtilizationAlert": {
+        "properties": {
+          "scheme_name": {
+            "type": "string",
+            "title": "Scheme Name"
+          },
+          "scheme_code": {
+            "type": "string",
+            "title": "Scheme Code"
+          },
+          "district_name": {
+            "type": "string",
+            "title": "District Name"
+          },
+          "department_name": {
+            "type": "string",
+            "title": "Department Name"
+          },
+          "funds_allocated_lakhs": {
+            "type": "integer",
+            "title": "Funds Allocated Lakhs"
+          },
+          "funds_utilized_lakhs": {
+            "type": "integer",
+            "title": "Funds Utilized Lakhs"
+          },
+          "utilization_pct": {
+            "type": "number",
+            "title": "Utilization Pct"
+          },
+          "severity": {
+            "type": "string",
+            "enum": [
+              "critical",
+              "warning"
+            ],
+            "title": "Severity",
+            "description": "critical below 20%, warning below 40%"
+          },
+          "snapshot_date": {
+            "type": "string",
+            "format": "date",
+            "title": "Snapshot Date"
+          }
+        },
+        "type": "object",
+        "required": [
+          "scheme_name",
+          "scheme_code",
+          "district_name",
+          "department_name",
+          "funds_allocated_lakhs",
+          "funds_utilized_lakhs",
+          "utilization_pct",
+          "severity",
+          "snapshot_date"
+        ],
+        "title": "LowUtilizationAlert"
+      },
+      "MismatchInfo": {
+        "properties": {
+          "live": {
+            "type": "number",
+            "title": "Live",
+            "description": "Live (portal / budget table) figure, ₹ lakhs"
+          },
+          "official": {
+            "type": "number",
+            "title": "Official",
+            "description": "Official (CAG accounts) figure, ₹ lakhs"
+          },
+          "diff_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Diff Pct",
+            "description": "(live − official) / official × 100; null when official is 0"
+          }
+        },
+        "type": "object",
+        "required": [
+          "live",
+          "official",
+          "diff_pct"
+        ],
+        "title": "MismatchInfo",
+        "description": "Set in the combined view when the portal and the audited accounts differ by more than 2%."
+      },
+      "MonthlyExpenditure": {
+        "properties": {
+          "month": {
+            "type": "integer",
+            "title": "Month",
+            "description": "Calendar month, 1-12"
+          },
+          "amount_lakhs": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Amount Lakhs",
+            "description": "₹ lakhs"
+          }
+        },
+        "type": "object",
+        "required": [
+          "month",
+          "amount_lakhs"
+        ],
+        "title": "MonthlyExpenditure"
+      },
+      "NoteItem": {
+        "properties": {
+          "grant_no": {
+            "type": "integer",
+            "title": "Grant No"
+          },
+          "number": {
+            "type": "integer",
+            "title": "Number"
+          },
+          "section": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Section"
+          },
+          "kind": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Kind"
+          },
+          "category": {
+            "type": "string",
+            "enum": [
+              "saving",
+              "excess",
+              "unutilised",
+              "unutilised_supplementary",
+              "without_provision",
+              "comment"
+            ],
+            "title": "Category"
+          },
+          "reasons_not_communicated": {
+            "type": "boolean",
+            "title": "Reasons Not Communicated"
+          },
+          "text": {
+            "type": "string",
+            "title": "Text",
+            "description": "Verbatim note text"
+          },
+          "source": {
+            "$ref": "#/components/schemas/FigureSource"
+          }
+        },
+        "type": "object",
+        "required": [
+          "grant_no",
+          "number",
+          "section",
+          "kind",
+          "category",
+          "reasons_not_communicated",
+          "text",
+          "source"
+        ],
+        "title": "NoteItem"
+      },
+      "OfficialChain": {
+        "properties": {
+          "financial_year": {
+            "type": "string",
+            "title": "Financial Year"
+          },
+          "grants": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "title": "Grants",
+            "description": "Grant numbers summed (a department can have several)"
+          },
+          "original_lakhs": {
+            "type": "number",
+            "title": "Original Lakhs"
+          },
+          "supplementary_lakhs": {
+            "type": "number",
+            "title": "Supplementary Lakhs"
+          },
+          "reappropriation_lakhs": {
+            "type": "number",
+            "title": "Reappropriation Lakhs"
+          },
+          "final_grant_lakhs": {
+            "type": "number",
+            "title": "Final Grant Lakhs"
+          },
+          "surrendered_lakhs": {
+            "type": "number",
+            "title": "Surrendered Lakhs",
+            "description": "Amount surrendered during the year"
+          },
+          "gross_expenditure_lakhs": {
+            "type": "number",
+            "title": "Gross Expenditure Lakhs"
+          },
+          "saving_lakhs": {
+            "type": "number",
+            "title": "Saving Lakhs"
+          },
+          "excess_lakhs": {
+            "type": "number",
+            "title": "Excess Lakhs"
+          },
+          "recoveries_lakhs": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Recoveries Lakhs",
+            "description": "Recoveries deducted from expenditure (Appendix II); null if Appendix II isn't loaded"
+          },
+          "recoveries_estimate_lakhs": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Recoveries Estimate Lakhs",
+            "description": "Budget Estimate of those recoveries"
+          },
+          "net_expenditure_lakhs": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Net Expenditure Lakhs",
+            "description": "Gross expenditure − recoveries"
+          },
+          "sources": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/FigureSource"
+            },
+            "type": "object",
+            "title": "Sources",
+            "default": {}
+          }
+        },
+        "type": "object",
+        "required": [
+          "financial_year",
+          "grants",
+          "original_lakhs",
+          "supplementary_lakhs",
+          "reappropriation_lakhs",
+          "final_grant_lakhs",
+          "surrendered_lakhs",
+          "gross_expenditure_lakhs",
+          "saving_lakhs",
+          "excess_lakhs",
+          "recoveries_lakhs",
+          "recoveries_estimate_lakhs",
+          "net_expenditure_lakhs"
+        ],
+        "title": "OfficialChain",
+        "description": "How a year's audited grant became spending, from the CAG Appropriation Accounts (₹ lakhs):\noriginal + supplementary (+ re-appropriation, 2021-22 only) = final grant; final grant − gross\nexpenditure = saving − excess; gross expenditure − recoveries (Appendix II) = net expenditure.\nThe original grant is the amount passed with the budget; it has not been checked against the\nBudget Estimates in the J&K budget documents, so it is not called a Budget Estimate here."
+      },
+      "SchemeDetail": {
+        "properties": {
+          "view": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/View"
+              }
+            ],
+            "default": "combined"
+          },
+          "sources": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/FigureSource"
+            },
+            "type": "object",
+            "title": "Sources",
+            "default": {}
+          },
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "code": {
+            "type": "string",
+            "title": "Code"
+          },
+          "scheme_type": {
+            "$ref": "#/components/schemas/SchemeTypeEnum"
+          },
+          "department_name": {
+            "type": "string",
+            "title": "Department Name"
+          },
+          "total_outlay_lakhs": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total Outlay Lakhs"
+          },
+          "funds_allocated_lakhs": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Funds Allocated Lakhs"
+          },
+          "funds_released_lakhs": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Funds Released Lakhs"
+          },
+          "funds_utilized_lakhs": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Funds Utilized Lakhs"
+          },
+          "utilization_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Utilization Pct"
+          },
+          "physical_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Physical Pct"
+          },
+          "last_updated": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Updated"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "start_year": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Start Year"
+          },
+          "end_year": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "End Year"
+          },
+          "source_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Url"
+          },
+          "district_progress": {
+            "items": {
+              "$ref": "#/components/schemas/SchemeDistrictProgress"
+            },
+            "type": "array",
+            "title": "District Progress",
+            "default": []
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "code",
+          "scheme_type",
+          "department_name",
+          "total_outlay_lakhs",
+          "funds_allocated_lakhs",
+          "funds_released_lakhs",
+          "funds_utilized_lakhs",
+          "utilization_pct",
+          "physical_pct",
+          "last_updated",
+          "description",
+          "start_year",
+          "end_year",
+          "source_url"
+        ],
+        "title": "SchemeDetail"
+      },
+      "SchemeDistrictProgress": {
+        "properties": {
+          "district_id": {
+            "type": "integer",
+            "title": "District Id"
+          },
+          "district_name": {
+            "type": "string",
+            "title": "District Name"
+          },
+          "district_code": {
+            "type": "string",
+            "title": "District Code"
+          },
+          "division": {
+            "$ref": "#/components/schemas/DivisionEnum"
+          },
+          "target_physical": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target Physical"
+          },
+          "achieved_physical": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Achieved Physical"
+          },
+          "physical_unit": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Physical Unit"
+          },
+          "physical_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Physical Pct"
+          },
+          "funds_allocated_lakhs": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Funds Allocated Lakhs"
+          },
+          "funds_released_lakhs": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Funds Released Lakhs"
+          },
+          "funds_utilized_lakhs": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Funds Utilized Lakhs"
+          },
+          "utilization_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Utilization Pct"
+          },
+          "release_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Release Pct"
+          },
+          "snapshot_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Snapshot Date"
+          },
+          "scheme_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scheme Name"
+          },
+          "scheme_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scheme Code"
+          }
+        },
+        "type": "object",
+        "required": [
+          "district_id",
+          "district_name",
+          "district_code",
+          "division",
+          "target_physical",
+          "achieved_physical",
+          "physical_unit",
+          "physical_pct",
+          "funds_allocated_lakhs",
+          "funds_released_lakhs",
+          "funds_utilized_lakhs",
+          "utilization_pct",
+          "release_pct",
+          "snapshot_date"
+        ],
+        "title": "SchemeDistrictProgress"
+      },
+      "SchemeHistoryPoint": {
+        "properties": {
+          "snapshot_date": {
+            "type": "string",
+            "format": "date",
+            "title": "Snapshot Date"
+          },
+          "funds_allocated_lakhs": {
+            "type": "integer",
+            "title": "Funds Allocated Lakhs"
+          },
+          "funds_utilized_lakhs": {
+            "type": "integer",
+            "title": "Funds Utilized Lakhs"
+          },
+          "utilization_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Utilization Pct"
+          }
+        },
+        "type": "object",
+        "required": [
+          "snapshot_date",
+          "funds_allocated_lakhs",
+          "funds_utilized_lakhs",
+          "utilization_pct"
+        ],
+        "title": "SchemeHistoryPoint",
+        "description": "One data point in the spending velocity time-series."
+      },
+      "SchemeSummary": {
+        "properties": {
+          "view": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/View"
+              }
+            ],
+            "default": "combined"
+          },
+          "sources": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/FigureSource"
+            },
+            "type": "object",
+            "title": "Sources",
+            "default": {}
+          },
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "code": {
+            "type": "string",
+            "title": "Code"
+          },
+          "scheme_type": {
+            "$ref": "#/components/schemas/SchemeTypeEnum"
+          },
+          "department_name": {
+            "type": "string",
+            "title": "Department Name"
+          },
+          "total_outlay_lakhs": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total Outlay Lakhs"
+          },
+          "funds_allocated_lakhs": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Funds Allocated Lakhs"
+          },
+          "funds_released_lakhs": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Funds Released Lakhs"
+          },
+          "funds_utilized_lakhs": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Funds Utilized Lakhs"
+          },
+          "utilization_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Utilization Pct"
+          },
+          "physical_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Physical Pct"
+          },
+          "last_updated": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Updated"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "code",
+          "scheme_type",
+          "department_name",
+          "total_outlay_lakhs",
+          "funds_allocated_lakhs",
+          "funds_released_lakhs",
+          "funds_utilized_lakhs",
+          "utilization_pct",
+          "physical_pct",
+          "last_updated"
+        ],
+        "title": "SchemeSummary"
+      },
+      "SchemeTypeEnum": {
+        "type": "string",
+        "enum": [
+          "css",
+          "central",
+          "ut"
+        ],
+        "title": "SchemeTypeEnum"
+      },
+      "SchemeVelocity": {
+        "properties": {
+          "view": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/View"
+              }
+            ],
+            "default": "combined"
+          },
+          "sources": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/FigureSource"
+            },
+            "type": "object",
+            "title": "Sources",
+            "default": {}
+          },
+          "scheme_id": {
+            "type": "integer",
+            "title": "Scheme Id"
+          },
+          "scheme_name": {
+            "type": "string",
+            "title": "Scheme Name"
+          },
+          "financial_year": {
+            "type": "string",
+            "title": "Financial Year"
+          },
+          "history": {
+            "items": {
+              "$ref": "#/components/schemas/SchemeHistoryPoint"
+            },
+            "type": "array",
+            "title": "History"
+          },
+          "days_elapsed": {
+            "type": "integer",
+            "title": "Days Elapsed"
+          },
+          "days_remaining": {
+            "type": "integer",
+            "title": "Days Remaining"
+          },
+          "daily_run_rate_lakhs": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Daily Run Rate Lakhs"
+          },
+          "projected_utilized_lakhs": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Projected Utilized Lakhs"
+          },
+          "total_allocated_lakhs": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total Allocated Lakhs"
+          },
+          "on_track": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "On Track"
+          },
+          "surrender_risk_lakhs": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Surrender Risk Lakhs"
+          },
+          "verdict": {
+            "type": "string",
+            "enum": [
+              "ON TRACK",
+              "AT RISK",
+              "CRITICAL",
+              "NO DATA"
+            ],
+            "title": "Verdict"
+          }
+        },
+        "type": "object",
+        "required": [
+          "scheme_id",
+          "scheme_name",
+          "financial_year",
+          "history",
+          "days_elapsed",
+          "days_remaining",
+          "daily_run_rate_lakhs",
+          "projected_utilized_lakhs",
+          "total_allocated_lakhs",
+          "on_track",
+          "surrender_risk_lakhs",
+          "verdict"
+        ],
+        "title": "SchemeVelocity",
+        "description": "Full velocity + projection payload for a scheme."
+      },
+      "SectionBlockItem": {
+        "properties": {
+          "grant_no": {
+            "type": "integer",
+            "title": "Grant No"
+          },
+          "section": {
+            "type": "string",
+            "title": "Section"
+          },
+          "kind": {
+            "type": "string",
+            "title": "Kind"
+          },
+          "original_lakhs": {
+            "type": "number",
+            "title": "Original Lakhs"
+          },
+          "supplementary_lakhs": {
+            "type": "number",
+            "title": "Supplementary Lakhs"
+          },
+          "reappropriation_lakhs": {
+            "type": "number",
+            "title": "Reappropriation Lakhs"
+          },
+          "final_grant_lakhs": {
+            "type": "number",
+            "title": "Final Grant Lakhs"
+          },
+          "expenditure_lakhs": {
+            "type": "number",
+            "title": "Expenditure Lakhs"
+          },
+          "saving_lakhs": {
+            "type": "number",
+            "title": "Saving Lakhs"
+          },
+          "excess_lakhs": {
+            "type": "number",
+            "title": "Excess Lakhs"
+          },
+          "surrendered_lakhs": {
+            "type": "number",
+            "title": "Surrendered Lakhs"
+          },
+          "source": {
+            "$ref": "#/components/schemas/FigureSource"
+          }
+        },
+        "type": "object",
+        "required": [
+          "grant_no",
+          "section",
+          "kind",
+          "original_lakhs",
+          "supplementary_lakhs",
+          "reappropriation_lakhs",
+          "final_grant_lakhs",
+          "expenditure_lakhs",
+          "saving_lakhs",
+          "excess_lakhs",
+          "surrendered_lakhs",
+          "source"
+        ],
+        "title": "SectionBlockItem",
+        "description": "One Voted/Charged block at the top of a grant's pages (₹ lakhs)."
+      },
+      "SyncStatusItem": {
+        "properties": {
+          "collector_name": {
+            "type": "string",
+            "title": "Collector Name"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "last_run": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Run"
+          },
+          "last_success": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Success"
+          },
+          "records_last_run": {
+            "type": "integer",
+            "title": "Records Last Run"
+          },
+          "next_run": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Run",
+            "description": "Next scheduled run from APScheduler; null if the scheduler is disabled"
+          },
+          "is_healthy": {
+            "type": "boolean",
+            "title": "Is Healthy"
+          },
+          "error_message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "collector_name",
+          "status",
+          "last_run",
+          "last_success",
+          "records_last_run",
+          "is_healthy"
+        ],
+        "title": "SyncStatusItem"
+      },
+      "TenderSummary": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "tender_ref": {
+            "type": "string",
+            "title": "Tender Ref"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "department_name": {
+            "type": "string",
+            "title": "Department Name"
+          },
+          "estimated_cost_lakhs": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Estimated Cost Lakhs"
+          },
+          "awarded_cost_lakhs": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Awarded Cost Lakhs"
+          },
+          "contractor_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Contractor Name"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status"
+          },
+          "published_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Published Date"
+          },
+          "award_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Award Date"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "tender_ref",
+          "title",
+          "department_name",
+          "estimated_cost_lakhs",
+          "awarded_cost_lakhs",
+          "contractor_name",
+          "status",
+          "published_date",
+          "award_date"
+        ],
+        "title": "TenderSummary"
+      },
+      "TriggerResponse": {
+        "properties": {
+          "message": {
+            "type": "string",
+            "title": "Message"
+          },
+          "started_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Started At"
+          },
+          "financial_year": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Financial Year"
+          }
+        },
+        "type": "object",
+        "required": [
+          "message",
+          "started_at"
+        ],
+        "title": "TriggerResponse"
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
+      },
+      "View": {
+        "type": "string",
+        "enum": [
+          "live",
+          "official",
+          "combined"
+        ],
+        "title": "View"
+      },
+      "YearOverYear": {
+        "properties": {
+          "current": {
+            "type": "number",
+            "title": "Current"
+          },
+          "previous": {
+            "type": "number",
+            "title": "Previous"
+          },
+          "change_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Change Pct"
+          }
+        },
+        "type": "object",
+        "required": [
+          "current",
+          "previous",
+          "change_pct"
+        ],
+        "title": "YearOverYear"
+      }
+    }
+  }
+}

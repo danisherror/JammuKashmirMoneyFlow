@@ -12,7 +12,9 @@ from datetime import datetime, timezone
 
 from database.connection import get_db
 from database.models import DataSyncLog, SchemeProgress, Scheme, District, Department, CollectorStatus
-from api.schemas import SyncStatusItem, LowUtilizationAlert, AccountabilityFlag
+from api.schemas import (
+    AccountabilityFlag, CAGFindingItem, LowUtilizationAlert, SyncStatusItem, TriggerResponse,
+)
 from api.official import grant_flags, latest_detail_year
 from scheduler.jobs import next_run_times
 
@@ -150,7 +152,7 @@ async def get_low_utilization_alerts(
     return results
 
 
-@router.post("/trigger/{collector_name}")
+@router.post("/trigger/{collector_name}", response_model=TriggerResponse)
 async def trigger_collector(
     collector_name: str,
     background_tasks: BackgroundTasks,
@@ -197,7 +199,7 @@ async def trigger_collector(
     }
 
 
-@router.post("/trigger-all")
+@router.post("/trigger-all", response_model=TriggerResponse)
 async def trigger_all_collectors(
     background_tasks: BackgroundTasks,
     financial_year: str = Query("2024-25"),
@@ -217,7 +219,7 @@ async def trigger_all_collectors(
     }
 
 
-@router.get("/cag-findings")
+@router.get("/cag-findings", response_model=list[CAGFindingItem])
 async def get_cag_findings(
     limit: int = 50,
     db: AsyncSession = Depends(get_db),

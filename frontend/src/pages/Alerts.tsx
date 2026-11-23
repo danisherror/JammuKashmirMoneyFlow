@@ -51,15 +51,20 @@ function UtilRow({ a }: { a: LowUtilizationAlert }) {
 
 // ── CAG Audit Finding Card ────────────────────────────────────────────────────
 
-const SEV_STYLES: Record<string, { color: string; bg: string; border: string; label: string }> = {
-  HIGH:   { color: '#ff3366', bg: 'rgba(255,51,102,0.08)',  border: 'rgba(255,51,102,0.35)',  label: '🔴 HIGH RISK' },
-  MEDIUM: { color: '#ffd700', bg: 'rgba(255,215,0,0.08)',   border: 'rgba(255,215,0,0.35)',   label: '🟡 MEDIUM' },
-  LOW:    { color: '#00aaff', bg: 'rgba(0,170,255,0.08)',   border: 'rgba(0,170,255,0.35)',   label: '🔵 LOW' },
+type SevStyle = { color: string; bg: string; border: string; label: string }
+
+// Keyed by the API's severity values (lowercase, backend CAGSeverity).
+const SEV_STYLES: Record<NonNullable<CAGFinding['severity']>, SevStyle> = {
+  high:   { color: '#ff3366', bg: 'rgba(255,51,102,0.08)',  border: 'rgba(255,51,102,0.35)',  label: '🔴 HIGH RISK' },
+  medium: { color: '#ffd700', bg: 'rgba(255,215,0,0.08)',   border: 'rgba(255,215,0,0.35)',   label: '🟡 MEDIUM' },
+  low:    { color: '#00aaff', bg: 'rgba(0,170,255,0.08)',   border: 'rgba(0,170,255,0.35)',   label: '🔵 LOW' },
 }
+// A finding without a severity is shown as unrated, not given one.
+const UNRATED: SevStyle = { color: '#8a8f98', bg: 'rgba(138,143,152,0.06)', border: 'rgba(138,143,152,0.35)', label: 'UNRATED' }
 
 function CAGCard({ f }: { f: CAGFinding }) {
   const [expanded, setExpanded] = useState(false)
-  const sev = SEV_STYLES[f.severity || 'MEDIUM'] ?? SEV_STYLES.MEDIUM
+  const sev = f.severity ? SEV_STYLES[f.severity] : UNRATED
 
   return (
     <div
@@ -162,7 +167,7 @@ export default function Alerts() {
   const flags = needLatest ? latestFlags ?? [] : yearFlags ?? []
   const flagYear = flags[0]?.financial_year
 
-  const highCount  = (cagFindings || []).filter(f => f.severity === 'HIGH').length
+  const highCount  = (cagFindings || []).filter(f => f.severity === 'high').length
   const totalFlags = (cagFindings || []).reduce((s, f) => s + (f.amount_flagged_lakhs || 0), 0)
 
   return (

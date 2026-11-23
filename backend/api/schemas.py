@@ -24,6 +24,17 @@ class SchemeTypeEnum(str, Enum):
     UT = "ut"
 
 
+# Closed sets of string values. They are Literals (not plain str) so /openapi.json, and the
+# TypeScript types generated from it (frontend/src/lib/api-schema.ts), carry the exact values.
+HeadLevel = Literal["major", "sub_major", "minor", "sub_head", "detailed"]
+NoteCategory = Literal[
+    "saving", "excess", "unutilised", "unutilised_supplementary", "without_provision", "comment",
+]
+GapFlag = Literal["critical", "warning", "on_track", "no_data"]
+Verdict = Literal["ON TRACK", "AT RISK", "CRITICAL", "NO DATA"]
+AbsorptionGrade = Literal["A", "B", "C", "D", "F"]
+
+
 # ── Provenance (todo.md 2.2a) ─────────────────────────────────────────────────
 
 class MismatchInfo(BaseModel):
@@ -116,10 +127,21 @@ class DepartmentSummary(Sourced):
         from_attributes = True
 
 
+class MonthlyExpenditure(BaseModel):
+    month: int = Field(description="Calendar month, 1-12")
+    amount_lakhs: Optional[float] = Field(description="₹ lakhs")
+
+
+class YearOverYear(BaseModel):
+    current: float
+    previous: float
+    change_pct: Optional[float]
+
+
 class DepartmentDetail(DepartmentSummary):
-    monthly_expenditure: list[dict] = []       # [{month: 1, amount: 12345}, ...]
+    monthly_expenditure: list[MonthlyExpenditure] = []
     schemes: list[dict] = []
-    year_over_year: Optional[dict] = None      # {current: X, previous: Y, change_pct: Z}
+    year_over_year: Optional[YearOverYear] = None
     official_chain: Optional[OfficialChain] = Field(
         None, description="Audited original → final grant → spent chain; null in the live view or for a year "
                           "without CAG accounts"
@@ -153,7 +175,7 @@ class SectionBlockItem(BaseModel):
 
 
 class HeadPathPart(BaseModel):
-    level: str = Field(description="major | sub_major | minor | sub_head | detailed")
+    level: HeadLevel
     code: str
     name: str
 
@@ -164,9 +186,7 @@ class HeadRowItem(BaseModel):
     section: str
     kind: str
     note_number: int
-    category: str = Field(
-        description="saving | excess | unutilised | unutilised_supplementary | without_provision"
-    )
+    category: NoteCategory
     reasons_not_communicated: bool
     head_code: str
     head_name: str
@@ -185,7 +205,7 @@ class HeadRowItem(BaseModel):
 
 class HeadNode(BaseModel):
     """A node of the head tree (major → sub-major → minor → sub-head → detailed head)."""
-    level: str
+    level: HeadLevel
     code: str
     name: str
     head_code: str = Field(description="Codes from the major head down to this node, joined by dots")
@@ -200,7 +220,7 @@ class NoteItem(BaseModel):
     number: int
     section: Optional[str]
     kind: Optional[str]
-    category: str
+    category: NoteCategory
     reasons_not_communicated: bool
     text: str = Field(description="Verbatim note text")
     source: FigureSource
@@ -209,7 +229,7 @@ class NoteItem(BaseModel):
 class DocumentIssueItem(BaseModel):
     """Something the parser kept aside rather than guessing (a non-head table, a misfiled row, a footnote)."""
     grant_no: Optional[int]
-    kind: str
+    kind: Literal["skipped_table", "misfiled", "footnote", "headerless_table"]
     page: Optional[int]
     text: str
 
@@ -260,7 +280,7 @@ class GapAnalysisItem(Sourced):
     utilized_lakhs: Optional[float]
     gap_lakhs: Optional[float]
     utilization_pct: Optional[float]
-    gap_flag: str                              # "critical" | "warning" | "on_track" | "no_data"
+    gap_flag: GapFlag
 
 
 # ── Schemes ───────────────────────────────────────────────────────────────────
@@ -341,7 +361,7 @@ class SchemeVelocity(Sourced):
     # Verdict
     on_track: Optional[bool]                  # True if projected >= allocated
     surrender_risk_lakhs: Optional[int]       # how much may be surrendered
-    verdict: str                              # "ON TRACK" | "AT RISK" | "CRITICAL" | "NO DATA"
+    verdict: Verdict
 
     class Config:
         from_attributes = True
@@ -363,7 +383,7 @@ class DistrictHeatmapItem(BaseModel):
     active_schemes_count: int
     # For map coloring
     absorption_score: Optional[float]         # 0-100 normalized score
-    absorption_grade: str                      # "A" | "B" | "C" | "D" | "F"
+    absorption_grade: AbsorptionGrade
 
     class Config:
         from_attributes = True
@@ -392,6 +412,26 @@ class SyncStatusItem(BaseModel):
         from_attributes = True
 
 
+class TriggerResponse(BaseModel):
+    message: str
+    started_at: datetime
+    financial_year: Optional[str] = None
+
+
+class CAGFindingItem(BaseModel):
+    """One row of GET /alerts/cag-findings."""
+    id: int
+    report_year: int
+    report_title: Optional[str]
+    department_name: Optional[str]
+    finding_summary: Optional[str]
+    finding_raw: str
+    amount_flagged_lakhs: Optional[float]
+    severity: Optional[Literal["high", "medium", "low"]]
+    paragraph_ref: Optional[str]
+    source_pdf_url: Optional[str]
+
+
 class LowUtilizationAlert(BaseModel):
     scheme_name: str
     scheme_code: str
@@ -400,7 +440,7 @@ class LowUtilizationAlert(BaseModel):
     funds_allocated_lakhs: int
     funds_utilized_lakhs: int
     utilization_pct: float
-    severity: str                              # "critical" (<20%) | "warning" (<40%)
+    severity: Literal["critical", "warning"] = Field(description="critical below 20%, warning below 40%")
     snapshot_date: date
 
     class Config:

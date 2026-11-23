@@ -7,7 +7,8 @@
     "dev": "vite",
     "build": "tsc && vite build",
     "preview": "vite preview",
-    "test": "vitest run"
+    "test": "vitest run",
+    "gen:api": "openapi-typescript openapi.json -o src/lib/api-schema.ts"
   },
   "dependencies": {
     "@tanstack/react-query": "5.100.1",
@@ -30,6 +31,7 @@
     "@types/react-dom": "18.3.7",
     "@vitejs/plugin-react": "4.7.0",
     "autoprefixer": "10.5.0",
+    "openapi-typescript": "7.13.0",
     "postcss": "8.5.10",
     "tailwindcss": "3.4.19",
     "typescript": "5.9.3",
