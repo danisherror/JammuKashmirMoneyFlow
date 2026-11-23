@@ -278,11 +278,13 @@ class SourceSnapshot(Base):
     """
     One saved copy of a source document (PDF/HTML/JSON), identified by its SHA-256.
     Rows derived from the document point here so anyone can re-check a figure.
+    Written through database.snapshots.save_snapshot; downloadable from GET /api/v1/snapshots/{id}.
     """
     __tablename__ = "source_snapshots"
 
     id = Column(Integer, primary_key=True)
-    source_type = Column(String(50), index=True, nullable=False)    # "appropriation_accounts"
+    source_type = Column(String(50), index=True, nullable=False)    # "appropriation_accounts", "jjm_collector"
+    collector_name = Column(String(100), index=True, nullable=True)  # collector or loader that fetched it
     title = Column(String(300), nullable=True)
     source_url = Column(String(500), nullable=False)
     sha256 = Column(String(64), unique=True, nullable=False)

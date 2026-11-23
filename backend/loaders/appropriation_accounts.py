@@ -24,7 +24,6 @@ Usage (from backend/):
 """
 from __future__ import annotations
 
-import hashlib
 import io
 import re
 from dataclasses import dataclass
@@ -42,13 +41,14 @@ from database.models import (
     AppropriationNote,
     AppropriationRecovery,
     AppropriationSectionBlock,
-    SourceSnapshot,
 )
+from database.snapshots import save_snapshot
 from parsers.appropriation_accounts import parse_appropriation_summary
 from parsers.appropriation_details import AppropriationDetails, parse_appropriation_details
 from parsers.appropriation_recoveries import AppropriationRecoveries, parse_appropriation_recoveries
 
 SOURCE_TYPE = "appropriation_accounts"
+LOADER_NAME = "appropriation_accounts_loader"   # source_snapshots.collector_name
 
 # Official PDFs, checked 2026-11-22 (see tests/fixtures/appropriation_accounts/SOURCES.md).
 KNOWN_DOCUMENTS = {
@@ -125,30 +125,19 @@ def load_appropriation_accounts(
     details = parse_appropriation_details(io.BytesIO(pdf_bytes), summary=summary, partial=partial_details)
     recoveries = parse_appropriation_recoveries(io.BytesIO(pdf_bytes), summary=summary)
 
-    sha256 = hashlib.sha256(pdf_bytes).hexdigest()
-    relative_path = Path(SOURCE_TYPE) / f"{sha256}.pdf"
-    target = snapshot_dir / relative_path
-    if not target.exists():
-        target.parent.mkdir(parents=True, exist_ok=True)
-        tmp = target.with_suffix(".part")
-        tmp.write_bytes(pdf_bytes)
-        tmp.replace(target)
-
     try:
-        snapshot = db.execute(select(SourceSnapshot).where(SourceSnapshot.sha256 == sha256)).scalar_one_or_none()
-        if snapshot is None:
-            snapshot = SourceSnapshot(
-                source_type=SOURCE_TYPE,
-                title=f"Appropriation Accounts {year}, Union Territory of Jammu and Kashmir",
-                source_url=source_url,
-                sha256=sha256,
-                storage_path=relative_path.as_posix(),
-                content_type="application/pdf",
-                byte_size=len(pdf_bytes),
-                fetched_at=fetched_at or datetime.now(timezone.utc),
-            )
-            db.add(snapshot)
-            db.flush()
+        snapshot = save_snapshot(
+            db,
+            pdf_bytes,
+            source_url=source_url,
+            source_type=SOURCE_TYPE,
+            content_type="application/pdf",
+            collector_name=LOADER_NAME,
+            title=f"Appropriation Accounts {year}, Union Territory of Jammu and Kashmir",
+            fetched_at=fetched_at or datetime.now(timezone.utc),
+            snapshot_dir=snapshot_dir,
+        )
+        sha256 = snapshot.sha256
 
         # Per table, which snapshots this year's rows come from. A table that should have rows but has
         # none (e.g. a database loaded before the grant-page tables existed) forces a reload.

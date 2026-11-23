@@ -109,6 +109,7 @@ class JJMCollector(BaseCollector):
         with self.get_http_client() as client:
             response = self.fetch_url(client, COVERAGE_API, params=params)
 
+        self.coverage_snapshot = self.snapshot(response, title="JJM district coverage, J&K")
         raw = response.json()
         rows = self._parse_coverage_response(raw)
 
@@ -135,6 +136,7 @@ class JJMCollector(BaseCollector):
         with self.get_http_client() as client:
             response = self.fetch_url(client, FUND_API, params=params)
 
+        self.fund_snapshot = self.snapshot(response, title="JJM fund utilisation, J&K")
         raw  = response.json()
         data = raw[0] if isinstance(raw, list) and raw else raw
         if not isinstance(data, dict):

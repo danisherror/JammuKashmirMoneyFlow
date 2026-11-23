@@ -11,7 +11,8 @@ from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_excep
 from sqlalchemy.orm import Session
 
 from collectors.http_policy import check_robots, http_headers
-from database.models import DataSyncLog, CollectorStatus
+from database.models import DataSyncLog, CollectorStatus, SourceSnapshot
+from database.snapshots import save_snapshot
 
 
 class SourceUnavailableError(Exception):
@@ -49,6 +50,8 @@ class BaseCollector(ABC):
     request_delay: float = 1.0
     # Timeout for each HTTP request
     request_timeout: float = 30.0
+    # Where snapshot() stores raw responses; None = settings.raw_snapshot_dir (tests override it)
+    snapshot_dir: Optional[str] = None
 
     def __init__(self, db: Session):
         self.db = db
@@ -59,6 +62,7 @@ class BaseCollector(ABC):
         self._records_skipped = 0
         self._skip_reasons: list[str] = []
         self._robots: dict[str, dict] = {}     # robots.txt result per URL fetched this run
+        self._snapshot_ids: list[int] = []     # source_snapshots saved this run
 
     # ── HTTP client setup ─────────────────────────────────────────────────────
 
@@ -103,6 +107,26 @@ class BaseCollector(ABC):
         response.raise_for_status()
         return response
 
+    def snapshot(self, response: httpx.Response, title: Optional[str] = None) -> SourceSnapshot:
+        """
+        Save the raw response body before parsing it (todo.md 1.4), so every figure derived from it
+        can point at the exact bytes. Returns the snapshot row; set its id on the rows you write.
+        Rolled back with everything else if the run fails (the file stays, unreferenced).
+        """
+        snapshot = save_snapshot(
+            self.db,
+            response.content,
+            source_url=str(response.url),
+            source_type=self.collector_name,
+            content_type=response.headers.get("content-type"),
+            collector_name=self.collector_name,
+            title=title,
+            snapshot_dir=self.snapshot_dir,
+        )
+        if snapshot.id not in self._snapshot_ids:
+            self._snapshot_ids.append(snapshot.id)
+        return snapshot
+
     def skip(self, reason: str):
         """Record a fetched row that could not be saved (e.g. unknown district)."""
         self._records_skipped += 1
@@ -137,6 +161,8 @@ class BaseCollector(ABC):
             extra.update(records_skipped=self._records_skipped, skip_reasons=self._skip_reasons)
         if self._robots:
             extra["robots"] = self._robots
+        if self._snapshot_ids:
+            extra["snapshot_ids"] = self._snapshot_ids
         if extra:
             self.sync_log.extra_info = extra
         if error:

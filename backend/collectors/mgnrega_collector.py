@@ -122,6 +122,7 @@ class MGNREGACollector(BaseCollector):
         with self.get_http_client() as client:
             response = self.fetch_url(client, url)  # retries 3× on timeout
 
+        self.progress_snapshot = self.snapshot(response, title="MGNREGA district-wise physical progress, J&K")
         rows = self._parse_district_table(response.text)
         if not rows:
             raise ValueError(
@@ -144,10 +145,11 @@ class MGNREGACollector(BaseCollector):
         with self.get_http_client() as client:
             response = self.fetch_url(client, url)
 
+        self.fund_snapshot = self.snapshot(response, title="MGNREGA statement of expenditure, J&K")
         result = self._parse_fund_table(response.text)
         if not any(result.values()):
             raise ValueError(
-                "MGNREGA fund statement parsed all zeros. "
+                "MGNREGA fund statement gave no fund figures. "
                 "Page may have changed structure. URL: " + url
             )
         logger.info(f"[mgnrega] Fund totals: {result}")

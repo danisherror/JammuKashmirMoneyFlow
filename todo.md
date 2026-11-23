@@ -99,7 +99,10 @@ In these collectors, the "live" path always throws, so the random generator alwa
 
 ### 1.4 Provenance in the data model
 The ground rules require every record to be traceable, but the models can't store that today. `SchemeProgress` has only a free-text `source` and `raw_data`; `BudgetAllocation` and `Expenditure` have only a default `source` string.
-- [ ] Add a `raw_snapshots` table: `id`, `source_url`, `fetched_at`, `sha256`, `content_type`, `storage_path`, `collector_name`.
+- [x] Add a `raw_snapshots` table: `id`, `source_url`, `fetched_at`, `sha256`, `content_type`, `storage_path`, `collector_name`. Done 2026-11-23:
+  - The table already existed as `source_snapshots` (added for the CAG PDFs in 2.2) with every field but `collector_name`, so it was extended instead of duplicated: `collector_name` added (existing databases get it on startup, checked on Postgres 14). The name stays `source_snapshots`.
+  - `database/snapshots.py`: `save_snapshot()` writes the bytes to `<RAW_SNAPSHOT_DIR>/<source_type>/<sha256><ext>` (atomically, once per hash) before recording the row; `snapshot_file()` resolves a row to its file and refuses paths outside the directory. The Appropriation Accounts loader uses it (`collector_name = "appropriation_accounts_loader"`).
+  - `BaseCollector.snapshot(response)` saves a fetched response; JJM and MGNREGA now save both responses they parse before parsing them, and each run lists its snapshots in `data_sync_log.extra_info.snapshot_ids`. Linking derived rows to them is the next task. Tests: `tests/test_snapshots.py`.
 - [ ] Add a non-null `snapshot_id` foreign key to every fact table (`budget_allocations`, `expenditures`, `scheme_progress`, `tenders`, `cag_findings`, DBT tables). Expose `source_url`, `fetched_at` and a snapshot download link in every API response schema.
 - [ ] Add `GET /api/v1/snapshots/{id}` to download the stored raw file.
 
