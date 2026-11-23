@@ -67,7 +67,7 @@ In these collectors, the "live" path always throws, so the random generator alwa
   - Existing Postgres databases get the new enum labels on startup (`add_missing_enum_values` in `database/connection.py`, since `create_all` never alters an enum); checked on a Postgres 14 database created with the old four labels. Drop it with 3.1.
   - Sync Status page and freshness strip show `partial` / `no_source` in amber, with the reason.
 - [x] Fix `next_run` in `/alerts/sync-status`. It hardcodes "06:00 IST daily", but `scheduler/jobs.py` schedules weekly + monthly. Read the real next fire time from APScheduler. Done 2026-11-23: `next_run` is now a datetime, the earliest `job.next_run_time` among the jobs that run that collector (`JOB_COLLECTORS` and `next_run_times()` in `scheduler/jobs.py`; the scheduler is kept on `app.state`), or null when the scheduler is disabled. Shown as "Next run" on the Sync Status page, which also had the tenders card looking up `tender_collector` instead of `tenders_collector`. Tests: `tests/test_scheduler_next_run.py`.
-- [ ] Make the README's "Data Sources" table match the actual scheduler.
+- [x] Make the README's "Data Sources" table match the actual scheduler. Done 2026-11-23: the table lists all eight collectors with the jobs that run them (weekly Sunday at `MGNREGA_FETCH_HOUR`, plus CGA's monthly run on the 26th at 08:00), each one's current status, and the hand-run Appropriation Accounts loader.
 
 **Done when:** a collector that writes zero real rows logs `partial` or `no_source` (never `success`), and `next_run` in `/alerts/sync-status` equals APScheduler's `job.next_run_time` for that job.
 
