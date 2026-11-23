@@ -376,7 +376,8 @@ export interface SyncStatusItem {
   last_run: ISODateTime | null
   last_success: ISODateTime | null
   records_last_run: number
-  next_run: string | null
+  /** Next scheduled run from APScheduler; null when the scheduler is disabled */
+  next_run: ISODateTime | null
   is_healthy: boolean
   error_message?: string | null
 }

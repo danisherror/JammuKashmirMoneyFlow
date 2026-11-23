@@ -23,6 +23,7 @@ async def lifespan(app: FastAPI):
     await seed_reference_data()
     scheduler = create_scheduler()
     scheduler.start()
+    app.state.scheduler = scheduler   # /alerts/sync-status reads next run times from it
     logger.info("Scheduler started.")
     yield
     scheduler.shutdown(wait=False)

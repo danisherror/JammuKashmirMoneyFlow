@@ -53,7 +53,7 @@ const COLLECTORS: CollectorDef[] = [
     phase: 1,
   },
   {
-    name: 'tender_collector',
+    name: 'tenders_collector',
     label: 'TENDERS',
     trigger_key: 'tenders',
     source: 'jktenders.gov.in',
@@ -199,6 +199,7 @@ export default function SyncStatus() {
                       { label: 'SCHEDULE', val: col.schedule },
                       { label: 'LAST RUN', val: timeAgo(s?.last_run ?? null) },
                       { label: 'LAST SUCCESS', val: timeAgo(s?.last_success ?? null) },
+                      { label: 'NEXT RUN', val: s?.next_run ? timeAgo(s.next_run) : 'Not scheduled' },
                       { label: 'RECORDS (LAST)', val: s ? String(s.records_last_run) : '—' },
                     ].map(({ label, val }) => (
                       <div key={label}>

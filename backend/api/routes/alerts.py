@@ -5,7 +5,7 @@ GET  /api/v1/alerts/low-utilization
 GET  /api/v1/alerts/accountability    (flags from the CAG Appropriation Accounts)
 POST /api/v1/alerts/trigger/{collector_name}  (manual run)
 """
-from fastapi import APIRouter, Depends, Query, HTTPException, BackgroundTasks
+from fastapi import APIRouter, Depends, Query, HTTPException, BackgroundTasks, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 from datetime import datetime, timezone
@@ -14,6 +14,7 @@ from database.connection import get_db
 from database.models import DataSyncLog, SchemeProgress, Scheme, District, Department, CollectorStatus
 from api.schemas import SyncStatusItem, LowUtilizationAlert, AccountabilityFlag
 from api.official import grant_flags, latest_detail_year
+from scheduler.jobs import next_run_times
 
 router = APIRouter(prefix="/alerts", tags=["Alerts"])
 
@@ -31,12 +32,14 @@ COLLECTOR_MAP = {
 
 
 @router.get("/sync-status", response_model=list[SyncStatusItem])
-async def get_sync_status(db: AsyncSession = Depends(get_db)):
+async def get_sync_status(request: Request, db: AsyncSession = Depends(get_db)):
     """
     Health check for all data collectors.
-    Shows last run time, status, records updated.
+    Shows last run time, status, records updated, and the next scheduled run
+    as reported by APScheduler (null when the scheduler is disabled).
     Drives the SyncStatusPanel on the frontend.
     """
+    next_runs = next_run_times(getattr(request.app.state, "scheduler", None))
     # Get latest run per collector
     subq = (
         select(
@@ -78,7 +81,7 @@ async def get_sync_status(db: AsyncSession = Depends(get_db)):
             last_run=log.started_at,
             last_success=last_success,
             records_last_run=(log.records_inserted or 0) + (log.records_updated or 0),
-            next_run="06:00 IST daily",
+            next_run=next_runs.get(log.collector_name),
             is_healthy=is_healthy,
             error_message=log.error_message if not is_healthy else None,
         ))

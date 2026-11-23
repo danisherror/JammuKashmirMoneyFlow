@@ -382,7 +382,9 @@ class SyncStatusItem(BaseModel):
     last_run: Optional[datetime]
     last_success: Optional[datetime]
     records_last_run: int
-    next_run: Optional[str]
+    next_run: Optional[datetime] = Field(
+        None, description="Next scheduled run from APScheduler; null if the scheduler is disabled"
+    )
     is_healthy: bool
     error_message: Optional[str] = None
 

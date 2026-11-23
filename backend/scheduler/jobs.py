@@ -4,6 +4,10 @@ Each collector job runs independently — a failure in one does NOT
 affect others. Failures are logged to data_sync_log so the
 /alerts/sync-status endpoint can surface them to the dashboard.
 """
+from datetime import datetime
+from typing import Optional
+
+from apscheduler.schedulers.base import BaseScheduler
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
 from loguru import logger
@@ -21,6 +25,39 @@ from collectors.pfms_collector import PFMSCollector
 from processors.gap_calculator import recalculate_all_gaps
 
 settings = get_settings()
+
+ALL_COLLECTORS = (
+    MGNREGACollector, JJMCollector, PMAYCollector, DBTCollector,
+    TendersCollector, CGACollector, CAGCollector, PFMSCollector,
+)
+
+# Which collectors each scheduled job runs. Keep in step with create_scheduler()
+# and the job functions below; tests/test_scheduler_next_run.py checks the ids.
+WEEKLY_JOB_ID = "weekly_all_collectors"
+MONTHLY_CGA_JOB_ID = "monthly_cga"
+JOB_COLLECTORS: dict[str, tuple[str, ...]] = {
+    WEEKLY_JOB_ID: tuple(c.collector_name for c in ALL_COLLECTORS),
+    MONTHLY_CGA_JOB_ID: (CGACollector.collector_name,),
+}
+
+
+def next_run_times(scheduler: Optional[BaseScheduler]) -> dict[str, datetime]:
+    """
+    Earliest upcoming fire time per collector, read from APScheduler's own
+    job.next_run_time (None for a paused job, so it is left out).
+    Empty when the scheduler is disabled or not started.
+    """
+    result: dict[str, datetime] = {}
+    if scheduler is None:
+        return result
+    for job in scheduler.get_jobs():
+        when = getattr(job, "next_run_time", None)   # absent until the scheduler starts
+        if when is None:
+            continue
+        for name in JOB_COLLECTORS.get(job.id, ()):
+            if name not in result or when < result[name]:
+                result[name] = when
+    return result
 
 
 def _run_collector(collector_class, **kwargs):
@@ -132,7 +169,7 @@ def create_scheduler() -> BackgroundScheduler:
             minute=0,
             timezone="Asia/Kolkata",
         ),
-        id="weekly_all_collectors",
+        id=WEEKLY_JOB_ID,
         name="Weekly: All Collectors",
         replace_existing=True,
         misfire_grace_time=3600,    # if server was down, run within 1 hour of missed time
@@ -147,7 +184,7 @@ def create_scheduler() -> BackgroundScheduler:
             minute=0,
             timezone="Asia/Kolkata",
         ),
-        id="monthly_cga",
+        id=MONTHLY_CGA_JOB_ID,
         name="Monthly: CGA Budget Collector",
         replace_existing=True,
         misfire_grace_time=86400,   # 1 day grace time
