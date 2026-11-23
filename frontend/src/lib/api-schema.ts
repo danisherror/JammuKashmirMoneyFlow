@@ -1146,6 +1146,18 @@ export interface components {
             printed_error: string | null;
             source: components["schemas"]["FigureSource"];
         };
+        /** HealthResponse */
+        HealthResponse: {
+            /** Status */
+            status: string;
+            /** Version */
+            version: string;
+            /**
+             * Demo Mode
+             * @description True when made-up demo allocations are loaded (DEMO_MODE=true); the dashboard shows a red DEMO DATA banner
+             */
+            demo_mode: boolean;
+        };
         /** LowUtilizationAlert */
         LowUtilizationAlert: {
             /** Scheme Name */
@@ -2510,7 +2522,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["HealthResponse"];
                 };
             };
         };

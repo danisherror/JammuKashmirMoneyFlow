@@ -93,6 +93,10 @@ export type TriggerResponse = Schemas['TriggerResponse']
 export type TenderSummary = Schemas['TenderSummary']
 export type ContractorLeaderboardItem = Schemas['ContractorLeaderboardItem']
 
+// Health
+/** `demo_mode` true means made-up demo allocations are loaded (DEMO_MODE=true). */
+export type HealthResponse = Schemas['HealthResponse']
+
 // DBT
 export type DBTSchemeSummary = Schemas['DBTSchemeSummary']
 export type DBTDistrictGap = Schemas['DBTDistrictGap']
@@ -104,6 +108,8 @@ const get = async <T>(url: string, params?: Record<string, unknown>): Promise<T>
 
 const post = async <T>(url: string, params?: Record<string, unknown>): Promise<T> =>
   (await api.post<T>(url, null, { params })).data
+
+export const fetchHealth = () => get<HealthResponse>('/health')
 
 // Budget
 // Budget and scheme routes take `view` (todo.md 2.2a); the backend defaults to combined.

@@ -35,6 +35,15 @@ Verdict = Literal["ON TRACK", "AT RISK", "CRITICAL", "NO DATA"]
 AbsorptionGrade = Literal["A", "B", "C", "D", "F"]
 
 
+class HealthResponse(BaseModel):
+    status: str
+    version: str
+    demo_mode: bool = Field(
+        description="True when made-up demo allocations are loaded (DEMO_MODE=true); the dashboard shows "
+                    "a red DEMO DATA banner"
+    )
+
+
 # ── Provenance (todo.md 2.2a) ─────────────────────────────────────────────────
 
 class MismatchInfo(BaseModel):

@@ -1,13 +1,14 @@
 """
 Static reference data for J&K money flow tracker.
 Departments, Districts, and Schemes that don't change with scrapes.
-All monetary figures are in LAKHS (1 lakh = 100,000 INR).
-Budget figures from: J&K Budget 2024-25 documents (jkfinance.nic.in)
+Budget allocations are not seeded here: the old figures had no citation (the 2023-24 ones were
+"scaled down by ~10% for demonstration"), so they now live in database/demo_data.py and load only
+with DEMO_MODE=true.
 """
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from database.models import (
-    Department, District, Scheme, BudgetAllocation, DivisionType, SchemeType, GrantDepartmentMap,
+    Department, District, Scheme, DivisionType, SchemeType, GrantDepartmentMap,
 )
 
 
@@ -35,55 +36,6 @@ DEPARTMENTS = [
     {"name": "Labour & Employment",                         "code": "LABOUR",     "division": DivisionType.CENTRAL},
     {"name": "Animal & Sheep Husbandry",                    "code": "ANIMAL",     "division": DivisionType.CENTRAL},
 ]
-
-# Budget allocations FY2024-25 (in lakhs) — from J&K Budget documents
-BUDGET_2024_25 = {
-    "PWD":        {"budget_estimate": 450000, "is_capital": True},
-    "HEALTH":     {"budget_estimate": 285000, "is_capital": False},
-    "SCHOOLEDU":  {"budget_estimate": 320000, "is_capital": False},
-    "HIGHEREDU":  {"budget_estimate": 95000,  "is_capital": False},
-    "JALSHAKTI":  {"budget_estimate": 380000, "is_capital": True},
-    "PDD":        {"budget_estimate": 295000, "is_capital": True},
-    "AGRI":       {"budget_estimate": 125000, "is_capital": False},
-    "HORTI":      {"budget_estimate": 98000,  "is_capital": False},
-    "RDPR":       {"budget_estimate": 210000, "is_capital": False},
-    "ULB":        {"budget_estimate": 145000, "is_capital": True},
-    "SOCIALWEL":  {"budget_estimate": 87000,  "is_capital": False},
-    "POLICE":     {"budget_estimate": 420000, "is_capital": False},
-    "REVENUE":    {"budget_estimate": 68000,  "is_capital": False},
-    "INDUSTRIES": {"budget_estimate": 55000,  "is_capital": False},
-    "TOURISM":    {"budget_estimate": 42000,  "is_capital": True},
-    "FOREST":     {"budget_estimate": 38000,  "is_capital": False},
-    "FINANCE":    {"budget_estimate": 890000, "is_capital": False},   # includes pension, debt
-    "GAD":        {"budget_estimate": 72000,  "is_capital": False},
-    "LABOUR":     {"budget_estimate": 31000,  "is_capital": False},
-    "ANIMAL":     {"budget_estimate": 44000,  "is_capital": False},
-}
-
-# Estimated budget allocations FY2023-24 (in lakhs) — scaled down by ~10% for demonstration
-BUDGET_2023_24 = {
-    "PWD":        {"budget_estimate": 405000, "is_capital": True},
-    "HEALTH":     {"budget_estimate": 256500, "is_capital": False},
-    "SCHOOLEDU":  {"budget_estimate": 288000, "is_capital": False},
-    "HIGHEREDU":  {"budget_estimate": 85500,  "is_capital": False},
-    "JALSHAKTI":  {"budget_estimate": 342000, "is_capital": True},
-    "PDD":        {"budget_estimate": 265500, "is_capital": True},
-    "AGRI":       {"budget_estimate": 112500, "is_capital": False},
-    "HORTI":      {"budget_estimate": 88200,  "is_capital": False},
-    "RDPR":       {"budget_estimate": 189000, "is_capital": False},
-    "ULB":        {"budget_estimate": 130500, "is_capital": True},
-    "SOCIALWEL":  {"budget_estimate": 78300,  "is_capital": False},
-    "POLICE":     {"budget_estimate": 378000, "is_capital": False},
-    "REVENUE":    {"budget_estimate": 61200,  "is_capital": False},
-    "INDUSTRIES": {"budget_estimate": 49500,  "is_capital": False},
-    "TOURISM":    {"budget_estimate": 37800,  "is_capital": True},
-    "FOREST":     {"budget_estimate": 34200,  "is_capital": False},
-    "FINANCE":    {"budget_estimate": 801000, "is_capital": False},
-    "GAD":        {"budget_estimate": 64800,  "is_capital": False},
-    "LABOUR":     {"budget_estimate": 27900,  "is_capital": False},
-    "ANIMAL":     {"budget_estimate": 39600,  "is_capital": False},
-}
-
 
 # ── Districts ─────────────────────────────────────────────────────────────────
 
@@ -307,40 +259,7 @@ async def seed_departments(db: AsyncSession):
             division=dept_data["division"],
         )
         db.add(dept)
-
-    await db.flush()  # get IDs before inserting allocations
-
-    for dept_data in DEPARTMENTS:
-        code = dept_data["code"]
-        
-        # Seed both years
-        for fy, budget_dict in [("2024-25", BUDGET_2024_25), ("2023-24", BUDGET_2023_24)]:
-            if code not in budget_dict:
-                continue
-            result = await db.execute(select(Department).where(Department.code == code))
-            dept = result.scalar_one_or_none()
-            if not dept:
-                continue
-
-            # Check if allocation already exists
-            alloc_result = await db.execute(
-                select(BudgetAllocation).where(
-                    BudgetAllocation.department_id == dept.id,
-                    BudgetAllocation.financial_year == fy
-                )
-            )
-            if alloc_result.scalar_one_or_none():
-                continue
-
-            budget = budget_dict[code]
-            alloc = BudgetAllocation(
-                department_id=dept.id,
-                financial_year=fy,
-                budget_estimate=budget["budget_estimate"],
-                is_capital=budget["is_capital"],
-                source="jkfinance.nic.in",
-            )
-            db.add(alloc)
+    await db.flush()  # schemes and the grant map look departments up by code
 
 
 async def seed_districts(db: AsyncSession):

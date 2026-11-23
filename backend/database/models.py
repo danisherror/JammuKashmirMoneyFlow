@@ -3,7 +3,7 @@ from sqlalchemy import (
     Boolean, Text, ForeignKey, Enum as SAEnum, JSON, BigInteger, UniqueConstraint
 )
 from sqlalchemy.orm import declarative_base, relationship
-from sqlalchemy.sql import func
+from sqlalchemy.sql import false, func
 import enum
 
 Base = declarative_base()
@@ -116,6 +116,8 @@ class BudgetAllocation(Base):
     is_capital = Column(Boolean, default=False)              # capital or revenue head
     major_head = Column(String(10), nullable=True)           # accounting code
     source = Column(String(100), default="jkfinance.nic.in")
+    # Made-up row from database/demo_data.py (DEMO_MODE=true). Deleted on startup when demo mode is off.
+    is_demo = Column(Boolean, nullable=False, default=False, server_default=false(), index=True)
     last_updated = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
     department = relationship("Department", back_populates="allocations")

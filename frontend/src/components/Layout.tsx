@@ -8,6 +8,7 @@ import {
 } from 'lucide-react'
 import clsx from 'clsx'
 import DataFreshness from './DataFreshness'
+import DemoBanner from './DemoBanner'
 import ViewSwitch from './ViewSwitch'
 import { fetchBudgetOverview, triggerAllCollectors } from '../lib/api'
 import toast, { Toaster } from 'react-hot-toast'
@@ -148,6 +149,7 @@ export default function Layout() {
 
       {/* Main content */}
       <div className="flex-1 overflow-auto flex flex-col relative">
+        <DemoBanner />
         <Toaster position="top-right" toastOptions={{
           style: {
             background: '#0f172a',

@@ -15,6 +15,9 @@ implemented) live path failed. This removes what they left behind:
 | tenders            | tenders_collector         | tender_ref "NIT/<dept>/<year>/<4 digits>" from     |
 |                    |                           | jktenders.gov.in/nicgep/app                        |
 | cag_findings       | cag_collector             | the five invented MOCK_FINDINGS paragraphs         |
+| budget_allocations | database/seeds.py         | uncited seed figures (now database/demo_data.py):  |
+|                    |                           | is_demo false, source "jkfinance.nic.in", and the  |
+|                    |                           | department, year and amount equal a demo figure    |
 | data_sync_log      | the six collectors above  | old "success" runs relabelled "failed", since they |
 |                    |                           | saved simulated data, not real data                |
 
@@ -37,11 +40,14 @@ from datetime import date
 from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
+from database.demo_data import DEMO_ALLOCATIONS
 from database.models import (
+    BudgetAllocation,
     CAGFinding,
     CollectorStatus,
     DataSyncLog,
     DBTTransfer,
+    Department,
     Expenditure,
     Scheme,
     SchemeProgress,
@@ -137,6 +143,22 @@ def purge(db: Session, apply: bool = False, today: date | None = None) -> dict[s
     ).scalars().all()
     counts["cag_findings deleted"] = len(fake_cag)
 
+    # budget_allocations seeded before DEMO_MODE existed: no collector writes this table
+    demo_figures = {
+        (code, fy, budget["budget_estimate"])
+        for fy, budgets in DEMO_ALLOCATIONS.items()
+        for code, budget in budgets.items()
+    }
+    seeded_allocs = [
+        alloc for alloc, code in db.execute(
+            select(BudgetAllocation, Department.code)
+            .join(Department, BudgetAllocation.department_id == Department.id)
+            .where(BudgetAllocation.is_demo.is_(False), BudgetAllocation.source == "jkfinance.nic.in")
+        ).all()
+        if (code, alloc.financial_year, alloc.budget_estimate) in demo_figures
+    ]
+    counts["budget_allocations (uncited seed figures) deleted"] = len(seeded_allocs)
+
     old_successes = db.execute(
         select(DataSyncLog).where(
             DataSyncLog.collector_name.in_(SIMULATED_COLLECTORS),
@@ -150,7 +172,7 @@ def purge(db: Session, apply: bool = False, today: date | None = None) -> dict[s
         return counts
 
     stamp = (today or date.today()).isoformat()
-    for row in fake_progress + fake_dbt + fake_exp + fake_tenders + fake_cag:
+    for row in fake_progress + fake_dbt + fake_exp + fake_tenders + fake_cag + seeded_allocs:
         db.delete(row)
     for row in pfms_rows:
         row.funds_released = None

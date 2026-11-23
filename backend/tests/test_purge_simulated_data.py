@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 
 from database.models import (
     Base,
+    BudgetAllocation,
     CAGFinding,
     CollectorStatus,
     DataSyncLog,
@@ -30,7 +31,7 @@ def db():
     engine = create_engine("sqlite://")
     Base.metadata.create_all(engine)
     with Session(engine) as session:
-        dept = Department(name="Jal Shakti", code="JAL", division=DivisionType.CENTRAL)
+        dept = Department(name="Jal Shakti", code="JALSHAKTI", division=DivisionType.CENTRAL)
         dist = District(name="Jammu", code="JMU", division=DivisionType.JAMMU)
         session.add_all([dept, dist])
         session.flush()
@@ -80,6 +81,13 @@ def seed(db):
                    paragraph_ref="Para 3.2", source_pdf_url=FAKE_CAG_PDF_URL),
         CAGFinding(report_year=2024, report_title="A real report", finding_raw="real",
                    paragraph_ref="Para 3.2", source_pdf_url="https://cag.gov.in/real.pdf"),
+        # the old seed figure for JALSHAKTI 2024-25; the same amount for another year; a demo row
+        BudgetAllocation(department_id=dept, financial_year="2024-25", budget_estimate=380000,
+                         source="jkfinance.nic.in"),
+        BudgetAllocation(department_id=dept, financial_year="2022-23", budget_estimate=380000,
+                         source="jkfinance.nic.in"),
+        BudgetAllocation(department_id=dept, financial_year="2023-24", budget_estimate=342000,
+                         source="DEMO DATA — NOT REAL", is_demo=True),
         DataSyncLog(collector_name="pfms_collector", status=CollectorStatus.SUCCESS,
                     started_at=datetime(2026, 11, 2, tzinfo=timezone.utc), records_updated=1),
         DataSyncLog(collector_name="jjm_collector", status=CollectorStatus.SUCCESS,
@@ -95,6 +103,7 @@ EXPECTED = {
     "expenditures deleted": 1,
     "tenders deleted": 1,
     "cag_findings deleted": 1,
+    "budget_allocations (uncited seed figures) deleted": 1,
     "data_sync_log runs relabelled failed": 1,
 }
 
@@ -123,6 +132,8 @@ def test_apply_removes_only_simulated_rows(db):
     assert [e.source for e in db.execute(select(Expenditure)).scalars()] == ["cga.nic.in"]
     assert [t.tender_ref for t in db.execute(select(Tender)).scalars()] == ["e-NIT 12 of 2026-27"]
     assert [c.report_title for c in db.execute(select(CAGFinding)).scalars()] == ["A real report"]
+    # demo rows are left to startup (database.demo_data.delete_demo_rows)
+    assert sorted(a.financial_year for a in db.execute(select(BudgetAllocation)).scalars()) == ["2022-23", "2023-24"]
 
     logs = {log.collector_name: log for log in db.execute(select(DataSyncLog)).scalars()}
     assert logs["pfms_collector"].status is CollectorStatus.FAILED

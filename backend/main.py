@@ -10,6 +10,7 @@ from config import get_settings
 from database.connection import init_db, seed_reference_data
 from scheduler.jobs import create_scheduler
 from api.routes import budget, schemes, districts, alerts, export, tenders, dbt
+from api.schemas import HealthResponse
 
 settings = get_settings()
 scheduler = None
@@ -54,6 +55,6 @@ app.include_router(tenders.router, prefix="/api/v1")
 app.include_router(dbt.router, prefix="/api/v1")
 
 
-@app.get("/api/v1/health")
+@app.get("/api/v1/health", response_model=HealthResponse)
 async def health():
-    return {"status": "ok", "version": "1.0.0"}
+    return HealthResponse(status="ok", version="1.0.0", demo_mode=settings.demo_mode)

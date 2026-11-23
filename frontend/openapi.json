@@ -1617,7 +1617,9 @@
             "description": "Successful Response",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/HealthResponse"
+                }
               }
             }
           }
@@ -3325,6 +3327,30 @@
         ],
         "title": "HeadRowItem",
         "description": "One row of a note table (₹ lakhs). Amounts the PDF doesn't print are null, not 0."
+      },
+      "HealthResponse": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "version": {
+            "type": "string",
+            "title": "Version"
+          },
+          "demo_mode": {
+            "type": "boolean",
+            "title": "Demo Mode",
+            "description": "True when made-up demo allocations are loaded (DEMO_MODE=true); the dashboard shows a red DEMO DATA banner"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status",
+          "version",
+          "demo_mode"
+        ],
+        "title": "HealthResponse"
       },
       "LowUtilizationAlert": {
         "properties": {
