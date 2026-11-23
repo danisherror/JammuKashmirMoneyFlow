@@ -428,6 +428,8 @@ class AppropriationDocumentIssue(Base):
     snapshot_id = Column(Integer, ForeignKey("source_snapshots.id"), index=True, nullable=False)
     financial_year = Column(String(10), index=True, nullable=False)
     kind = Column(String(30), nullable=False)  # skipped_table | misfiled | footnote | headerless_table
+    grant_no = Column(Integer, nullable=True)  # from the text's "page P, grant N" prefix
+    page = Column(Integer, nullable=True)
     text = Column(Text, nullable=False)
 
 

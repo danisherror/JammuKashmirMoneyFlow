@@ -126,6 +126,110 @@ class DepartmentDetail(DepartmentSummary):
     )
 
 
+# ── Grant breakdown (CAG Appropriation Accounts grant pages, todo.md 2.2b) ────
+
+class GrantInfo(BaseModel):
+    grant_no: int
+    name: str = Field(description="Official grant name as printed in the summary table")
+    department_id: Optional[int] = Field(description="Tracker department, via grant_department_map; null if unmapped")
+    final_grant_lakhs: Optional[float] = None
+    gross_expenditure_lakhs: Optional[float] = None
+
+
+class SectionBlockItem(BaseModel):
+    """One Voted/Charged block at the top of a grant's pages (₹ lakhs)."""
+    grant_no: int
+    section: str
+    kind: str
+    original_lakhs: float
+    supplementary_lakhs: float
+    reappropriation_lakhs: float
+    final_grant_lakhs: float
+    expenditure_lakhs: float
+    saving_lakhs: float
+    excess_lakhs: float
+    surrendered_lakhs: float
+    source: FigureSource
+
+
+class HeadPathPart(BaseModel):
+    level: str = Field(description="major | sub_major | minor | sub_head | detailed")
+    code: str
+    name: str
+
+
+class HeadRowItem(BaseModel):
+    """One row of a note table (₹ lakhs). Amounts the PDF doesn't print are null, not 0."""
+    grant_no: int
+    section: str
+    kind: str
+    note_number: int
+    category: str = Field(
+        description="saving | excess | unutilised | unutilised_supplementary | without_provision"
+    )
+    reasons_not_communicated: bool
+    head_code: str
+    head_name: str
+    head_path: list[HeadPathPart]
+    original_lakhs: Optional[float]
+    supplementary_lakhs: Optional[float]
+    reappropriation_lakhs: Optional[float]
+    final_grant_lakhs: Optional[float]
+    expenditure_lakhs: Optional[float]
+    saving_lakhs: Optional[float]
+    excess_lakhs: Optional[float]
+    remark: str = Field(description="Official remark, verbatim")
+    printed_error: Optional[str] = Field(description="Set when the printed figures don't add up in the PDF itself")
+    source: FigureSource
+
+
+class HeadNode(BaseModel):
+    """A node of the head tree (major → sub-major → minor → sub-head → detailed head)."""
+    level: str
+    code: str
+    name: str
+    head_code: str = Field(description="Codes from the major head down to this node, joined by dots")
+    section: str
+    grant_no: int
+    rows: list[HeadRowItem] = Field(description="Note rows for exactly this head")
+    children: list["HeadNode"] = []
+
+
+class NoteItem(BaseModel):
+    grant_no: int
+    number: int
+    section: Optional[str]
+    kind: Optional[str]
+    category: str
+    reasons_not_communicated: bool
+    text: str = Field(description="Verbatim note text")
+    source: FigureSource
+
+
+class DocumentIssueItem(BaseModel):
+    """Something the parser kept aside rather than guessing (a non-head table, a misfiled row, a footnote)."""
+    grant_no: Optional[int]
+    kind: str
+    page: Optional[int]
+    text: str
+
+
+class GrantBreakdown(BaseModel):
+    """
+    Where a department's (or one grant's) money went, from the grant pages of the CAG Appropriation
+    Accounts. The notes list only the heads with notable savings, excesses or unspent provisions,
+    so the head rows do not add up to the grant total; the section blocks do.
+    """
+    financial_year: str
+    department_id: Optional[int]
+    grants: list[GrantInfo]
+    section_blocks: list[SectionBlockItem]
+    tree: list[HeadNode]
+    notes: list[NoteItem]
+    issues: list[DocumentIssueItem]
+    note: Optional[str] = Field(None, description="Why the breakdown is empty, when it is")
+
+
 class GapAnalysisItem(Sourced):
     department_id: int
     department_name: str

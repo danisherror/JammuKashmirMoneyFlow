@@ -4,6 +4,9 @@ GET /api/v1/budget/overview
 GET /api/v1/budget/departments
 GET /api/v1/budget/departments/{id}
 GET /api/v1/budget/gap-analysis
+GET /api/v1/budget/departments/{id}/breakdown
+GET /api/v1/budget/grants
+GET /api/v1/budget/grants/{grant_no}/breakdown
 
 Every route takes `?view=live|official|combined` (default combined; see processors.combined_view)
 and returns a `sources` map saying where each figure comes from. Official figures are the CAG
@@ -23,13 +26,15 @@ from api.figures import (
     pct,
     to_source,
 )
-from api.official import department_grants, official_chain
+from api.official import department_grants, grant_breakdown, latest_detail_year, list_grants, official_chain
 from api.schemas import (
     BudgetOverview,
     DepartmentDetail,
     DepartmentSummary,
     FigureSource,
     GapAnalysisItem,
+    GrantBreakdown,
+    GrantInfo,
 )
 from database.connection import get_db
 from database.models import Department, Expenditure, Scheme, SchemeProgress
@@ -293,3 +298,52 @@ async def get_gap_analysis(
 
     results.sort(key=lambda x: (x.gap_lakhs is not None, x.gap_lakhs or 0), reverse=True)
     return results
+
+
+# ── Grant breakdown (CAG Appropriation Accounts grant pages) ──────────────────
+
+BREAKDOWN_YEAR = Query(
+    None, description="Financial year, e.g. 2023-24. Default: the latest year with CAG grant pages loaded"
+)
+
+
+async def _breakdown_year(db: AsyncSession, financial_year: str | None) -> str:
+    year = financial_year or await latest_detail_year(db)
+    if year is None:
+        raise HTTPException(status_code=404, detail="No CAG Appropriation Accounts grant pages are loaded")
+    return year
+
+
+@router.get("/grants", response_model=list[GrantInfo])
+async def get_grants(financial_year: str | None = BREAKDOWN_YEAR, db: AsyncSession = Depends(get_db)):
+    """Every grant in the year's CAG accounts, including those not mapped to a tracker department."""
+    return await list_grants(db, await _breakdown_year(db, financial_year))
+
+
+@router.get("/departments/{dept_id}/breakdown", response_model=GrantBreakdown)
+async def get_department_breakdown(
+    dept_id: int, financial_year: str | None = BREAKDOWN_YEAR, db: AsyncSession = Depends(get_db)
+):
+    """
+    Where a department's audited grant went: section blocks, the head tree from the Notes and
+    Comments (amounts, verbatim remark, PDF page) and the notes themselves. Official figures only,
+    so there is no `view` parameter. The head rows are the heads the CAG chose to comment on; they
+    don't add up to the grant total.
+    """
+    if not await db.get(Department, dept_id):
+        raise HTTPException(status_code=404, detail="Department not found")
+    year = await _breakdown_year(db, financial_year)
+    return await grant_breakdown(db, year, await department_grants(db, year, dept_id), department_id=dept_id)
+
+
+@router.get("/grants/{grant_no}/breakdown", response_model=GrantBreakdown)
+async def get_grant_breakdown(
+    grant_no: int, financial_year: str | None = BREAKDOWN_YEAR, db: AsyncSession = Depends(get_db)
+):
+    """The same breakdown for one grant number, mapped to a tracker department or not."""
+    year = await _breakdown_year(db, financial_year)
+    result = await grant_breakdown(db, year, [grant_no])
+    if not result.grants:
+        raise HTTPException(status_code=404, detail=f"Grant {grant_no} is not in the {year} accounts")
+    mapped = result.grants[0].department_id
+    return result.model_copy(update={"department_id": mapped})

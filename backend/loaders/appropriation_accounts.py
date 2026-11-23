@@ -26,6 +26,7 @@ from __future__ import annotations
 
 import hashlib
 import io
+import re
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -69,6 +70,9 @@ class LoadResult:
     rows: int  # summary rows
     head_rows: int = 0  # note-table rows from the grant pages
 
+
+# The parser prefixes each side note with where it was found: "page 43, grant 6, note 8: ...".
+_ISSUE_WHERE_RE = re.compile(r"^page (\d+), grant (\d+)\b")
 
 # Every table holding rows derived from one year's document; all are replaced together.
 YEAR_TABLES = (
@@ -288,10 +292,18 @@ def _detail_rows(details: AppropriationDetails, snapshot_id: int) -> list:
         ("footnote", details.footnotes),
         ("headerless_table", details.headerless_tables),
     ):
-        rows += [
-            AppropriationDocumentIssue(snapshot_id=snapshot_id, financial_year=year, kind=kind, text=text)
-            for text in texts
-        ]
+        for text in texts:
+            where = _ISSUE_WHERE_RE.match(text)
+            rows.append(
+                AppropriationDocumentIssue(
+                    snapshot_id=snapshot_id,
+                    financial_year=year,
+                    kind=kind,
+                    page=int(where.group(1)) if where else None,
+                    grant_no=int(where.group(2)) if where else None,
+                    text=text,
+                )
+            )
     return rows
 
 

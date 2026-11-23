@@ -127,3 +127,103 @@ def test_overview_chain_covers_every_loaded_grant(setup):
     # Appendix II covers every grant, so the UT-wide recoveries are the Appendix II total.
     assert chain["recoveries_lakhs"] == 54120.20
     assert get(client, "/budget/overview", financial_year=YEAR, view="live")["official_chain"] is None
+
+
+# ── Breakdown (head tree, notes, section blocks) ──────────────────────────────
+
+def find_node(nodes, head_code):
+    for node in nodes:
+        if node["head_code"] == head_code:
+            return node
+        found = find_node(node["children"], head_code)
+        if found:
+            return found
+    return None
+
+
+def all_rows(nodes):
+    for node in nodes:
+        yield from node["rows"]
+        yield from all_rows(node["children"])
+
+
+def test_department_breakdown_tree(setup):
+    client, ids, snapshot_id = setup
+    data = get(client, f"/budget/departments/{ids['GAD']}/breakdown", financial_year=YEAR)
+    assert data["department_id"] == ids["GAD"]
+    assert [(g["grant_no"], g["department_id"]) for g in data["grants"]] == [(1, ids["GAD"])]
+    assert {(b["section"], b["kind"]) for b in data["section_blocks"]} == {
+        ("revenue", "voted"), ("revenue", "charged"), ("capital", "voted")
+    }
+
+    major = find_node(data["tree"], "2052")
+    assert major["level"] == "major" and major["rows"] == []
+    leaf = find_node(data["tree"], "2052.090.0099.0518")
+    assert [n["level"] for n in leaf["rows"][0]["head_path"]] == ["major", "minor", "sub_head", "detailed"]
+    (row,) = leaf["rows"]
+    assert (row["original_lakhs"], row["supplementary_lakhs"], row["reappropriation_lakhs"]) == (6390.50, 0, -177.15)
+    assert (row["final_grant_lakhs"], row["expenditure_lakhs"], row["saving_lakhs"]) == (6213.35, 4252.59, 1960.76)
+    assert row["category"] == "saving" and row["reasons_not_communicated"] is True
+    assert row["remark"].startswith("Less expenditure against the provision mainly in respect of Salary")
+    assert row["source"]["snapshot_id"] == snapshot_id
+    assert row["source"]["page"] >= 1 and row["source"]["label"].endswith(f"p.{row['source']['page']}")
+
+
+def test_unprinted_amounts_stay_null(setup):
+    client, ids, _ = setup
+    data = get(client, f"/budget/departments/{ids['GAD']}/breakdown", financial_year=YEAR)
+    (row,) = find_node(data["tree"], "2013.101.0099.0431")["rows"]
+    assert row["category"] == "unutilised"
+    assert (row["final_grant_lakhs"], row["expenditure_lakhs"], row["saving_lakhs"]) == (650.00, None, None)
+
+
+def test_breakdown_notes_are_verbatim(setup):
+    client, ids, _ = setup
+    data = get(client, f"/budget/departments/{ids['COOP']}/breakdown", financial_year=YEAR)
+    assert [(n["number"], n["category"]) for n in data["notes"]] == [
+        (1, "comment"), (2, "excess"), (3, "saving"), (4, "unutilised_supplementary"),
+        (5, "without_provision"), (6, "comment"), (7, "saving"),
+    ]
+    rows = list(all_rows(data["tree"]))
+    without = [r for r in rows if r["category"] == "without_provision"]
+    assert [(r["head_code"], r["expenditure_lakhs"], r["final_grant_lakhs"]) for r in without] == [
+        ("2425.107.0099.6028", 148.43, None),
+        ("2425.108.0031.6059", 26.25, None),
+        ("2425.108.0099.6059", 5.25, None),
+    ]
+
+
+def test_unmapped_grant_breakdown_and_issues(setup):
+    client, _, _ = setup
+    data = get(client, "/budget/grants/24/breakdown", financial_year=YEAR)
+    assert data["department_id"] is None
+    assert data["grants"][0]["grant_no"] == 24
+    assert [(i["grant_no"], i["kind"]) for i in data["issues"]] == [(24, "headerless_table")]
+    row = next(r for r in all_rows(data["tree"]) if r["head_code"] == "4059.60.800.0011.0464")
+    assert (row["final_grant_lakhs"], row["expenditure_lakhs"], row["excess_lakhs"]) == (2850.00, 2906.20, 56.20)
+
+
+def test_grant_list_includes_unmapped_grants(setup):
+    client, ids, _ = setup
+    grants = {g["grant_no"]: g for g in get(client, "/budget/grants", financial_year=YEAR)}
+    assert len(grants) == 36  # every grant in the summary table
+    assert grants[1]["department_id"] == ids["GAD"]
+    assert grants[24]["department_id"] is None
+    assert grants[1]["final_grant_lakhs"] == 72427.70
+
+
+def test_breakdown_defaults_to_the_latest_loaded_year(setup):
+    client, ids, _ = setup
+    assert get(client, f"/budget/departments/{ids['GAD']}/breakdown")["financial_year"] == YEAR
+
+
+def test_breakdown_empty_and_missing_cases(setup):
+    client, ids, _ = setup
+    data = get(client, f"/budget/departments/{ids['ULB']}/breakdown", financial_year=YEAR)
+    assert data["grants"] == [] and data["tree"] == []
+    assert "No CAG grant is mapped" in data["note"]
+    get(client, "/budget/departments/9999/breakdown", status=404)
+    get(client, "/budget/grants/99/breakdown", status=404, financial_year=YEAR)
+    # Grant 7 is in the summary but its pages aren't in the fixture.
+    data = get(client, "/budget/grants/7/breakdown", financial_year=YEAR)
+    assert data["tree"] == [] and "No grant pages" in data["note"]
